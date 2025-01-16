@@ -56,3 +56,12 @@ This project provides a minimal setup integrating React with Vite for frontend d
    npm run dev
    ```
 
+## New Components
+
+- **UserHome**: A component located in `client/src/pages/user/` that serves as the main interface for users. It includes navigation, search functionality, and displays promotional content.
+- **FooterNav**: A reusable navigation footer component used across various pages for consistent user navigation experience.
+
+## Additional Notes
+
+- Ensure that all assets are properly linked and accessible within the `client/src/assets/` directory.
+- Regularly update dependencies to keep up with the latest versions of React, Vite, and Express for security and performance improvements.
