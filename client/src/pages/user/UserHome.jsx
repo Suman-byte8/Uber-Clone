@@ -164,25 +164,25 @@ const UserHome = () => {
       <div className="footer-nav w-screen p-4 border-t-2 white fixed h-[4rem] bg-[#2A3335] bottom-0 left-0 flex items-center justify-between">
         {/* home */}
         <div className="home text-white flex flex-col items-center justify-center">
-          <i class="ri-home-9-fill text-xl"></i>
+          <i className="ri-home-9-fill text-xl"></i>
           <p className="text-md font-medium">Home</p>
         </div>
 
         {/* services */}
         <div className="home text-white flex flex-col items-center justify-center">
-          <i class="ri-customer-service-line text-xl"></i>
+          <i className="ri-customer-service-line text-xl"></i>
           <p className="text-md font-medium">Services</p>
         </div>
 
         {/* activity */}
         <div className="home text-white flex flex-col items-center justify-center">
-          <i class="ri-booklet-fill text-xl"></i>
+          <i className="ri-booklet-fill text-xl"></i>
           <p className="text-md font-medium">Activity</p>
         </div>
 
         {/* account */}
         <div className="home text-white flex flex-col items-center justify-center">
-          <i class="ri-user-fill text-xl"></i>
+          <i className="ri-user-fill text-xl"></i>
           <p className="text-md font-medium">Account</p>
         </div>
       </div>
