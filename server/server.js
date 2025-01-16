@@ -1,15 +1,25 @@
-require('dotenv').config();
 const express = require('express');
+const dotenv = require('dotenv');
+const connectDB = require('./database/db');
+dotenv.config();
+
 const app = express();
-const PORT = process.env.PORT || 3000;
+const port = process.env.PORT || 8000;
 
-// Import routes from index.js
-const routes = require('./index');
+const userRoutes = require('./routes/user.route');
+const captainRoutes = require('./routes/captain.route');
 
-// Use the imported routes
-app.use('/', routes);
+app.use(express.json())
 
-// Start the server
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+app.get('/', (req, res) => {
+  res.send("Hello World");
+})
+
+connectDB()
+
+app.use('/api/user', userRoutes)
+app.use('/api/captain',captainRoutes)
+
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
 });
