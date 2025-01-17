@@ -1,4 +1,5 @@
 const User = require('../models/user.model');
+const { hashPassword } = require('../services/hashPassword');
 const { generateToken } = require('../services/JWToken');
 
 // @desc    Register a new user

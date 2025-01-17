@@ -17,7 +17,7 @@ const Home = () => {
 
       <h1 className="text-white font-semibold text-4xl">Move With Safety</h1>
 
-      <Link to='/signup' className='bg-black w-full  p-5 rounded-xl text-white flex items-center justify-between text-xl font-medium'>Get started <i className="ri-arrow-right-line text-2xl"></i></Link>
+      <Link to='/auth' className='bg-black w-full  p-5 rounded-xl text-white flex items-center justify-between text-xl font-medium'>Get started <i className="ri-arrow-right-line text-2xl"></i></Link>
     </div>
   );
 };

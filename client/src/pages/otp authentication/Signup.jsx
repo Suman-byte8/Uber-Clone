@@ -2,12 +2,13 @@ import React from "react";
 import googleLogo from '../../assets/google_logo.png'
 import emailLogo from '../../assets/email_logo.png'
 import appleLogo from '../../assets/apple_logo.png'
+import { Link } from "react-router-dom";
 
 
 
 const Signup = () => {
   return (
-    <div className="h-screen w-screen p-4 flex items-center flex-col">
+    <div className="max-h-screen w-screen p-4 flex items-center flex-col">
       <h4 className="w-screen px-4 font-base text-2xl">
         Enter your mobile number
       </h4>
@@ -24,9 +25,9 @@ const Signup = () => {
         <i className="ri-user-shared-2-line font-bold text-xl"></i>
       </div>
 
-      <button className="bg-black w-full  p-5 rounded-xl text-white flex items-center justify-center text-xl font-medium">
+      <Link to='/auth' className="bg-black w-full  p-5 rounded-xl text-white flex items-center justify-center text-xl font-medium">
         Continue
-      </button>
+      </Link>
 
       <div className="_or w-full flex my-4">
         <div className="w-full border-t border-gray-400 my-4"></div>
