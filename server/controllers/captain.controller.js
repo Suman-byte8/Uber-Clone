@@ -17,57 +17,56 @@ const registerCaptain = async (req, res) => {
         const {
             name,
             email,
-            phoneNumber,  // Updated from 'phone' to 'phoneNumber'
+            phoneNumber,
             password,
-            drivingLicense,  // Updated from 'license' to 'drivingLicense'
+            drivingLicense,
             vehicle
         } = req.body;
 
         // Check if captain already exists
-        const emailExists = await Captain.findOne({ email });
-        if (emailExists) {
-            return res.status(400).json({ message: 'Email already registered' });
+        const existingCaptain = await Captain.findOne({
+            $or: [{ email }, { phoneNumber }, { 'drivingLicense.number': drivingLicense.number }, { 'vehicle.licensePlate': vehicle.licensePlate }]
+        });
+
+        if (existingCaptain) {
+            return res.status(400).json({ message: 'Captain with the provided details already exists' });
         }
 
-        const phoneExists = await Captain.findOne({ phoneNumber });  // Updated from 'phone' to 'phoneNumber'
-        if (phoneExists) {
-            return res.status(400).json({ message: 'Phone number already registered' });
-        }
-
-const hashedPassword = await hashPassword(password)
+        // Hash password
+        const hashedPassword = await hashPassword(password);
 
         // Create new captain
         const captain = await Captain.create({
             name,
             email,
-            phoneNumber,  // Updated from 'phone' to 'phoneNumber'
-            password:hashedPassword,
-            drivingLicense,  // Updated from 'license' to 'drivingLicense'
+            phoneNumber,
+            password: hashedPassword,
+            drivingLicense,
             vehicle
         });
 
-        if (captain) {
-            // Generate JWT token
-            const token = jwt.sign(
-                { id: captain._id },
-                process.env.JWT_SECRET,
-                { expiresIn: '30d' }
-            );
+        // Generate JWT token
+        const token = jwt.sign(
+            { id: captain._id },
+            process.env.JWT_SECRET,
+            { expiresIn: '30d' }
+        );
 
-            res.status(201).json({
+        res.status(201).json({
+            message: 'Captain registered successfully',
+            captain: {
                 _id: captain._id,
                 name: captain.name,
                 email: captain.email,
-                phoneNumber: captain.phoneNumber,  // Updated from 'phone' to 'phoneNumber'
-                drivingLicense: captain.drivingLicense,  // Updated from 'license' to 'drivingLicense'
+                phoneNumber: captain.phoneNumber,
+                drivingLicense: captain.drivingLicense,
                 vehicle: captain.vehicle,
                 isVerified: captain.isVerified,
                 isActive: captain.isActive,
-                token
-            });
-        } else {
-            res.status(400).json({ message: 'Invalid captain data' });
-        }
+                rating: captain.rating
+            },
+            token
+        });
 
     } catch (error) {
         res.status(500).json({

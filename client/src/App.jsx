@@ -9,6 +9,7 @@ import TripPlan from "./pages/user/TripPlan";
 import AuthPage from "./pages/authentication/AuthPage";
 import UserSignUp from "./pages/user/UserSignUp";
 import CaptainSignUp from "./pages/captain/CaptainSignUp";
+import CaptainHome from "./pages/captain/CaptainHome";
 
 const App = () => {
   return (
@@ -22,6 +23,7 @@ const App = () => {
 
       <Route path="/user-signup" element={<UserSignUp />} />
       <Route path="/captain-signup" element={<CaptainSignUp />} />
+      <Route path="/captain-home" element={<CaptainHome />} />
     </Routes>
   );
 };

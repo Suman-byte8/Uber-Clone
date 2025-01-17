@@ -161,7 +161,7 @@ const UserHome = () => {
       </div>
 
       {/* nav footer */}
-      <div className="footer-nav w-screen p-4 border-t-2 white fixed h-[4rem] bg-[#2A3335] bottom-0 left-0 flex items-center justify-between">
+      <div className="footer-nav w-screen p-4 py-6 border-t-2 white fixed h-[4rem] bg-[#2A3335] bottom-0 left-0 flex items-center justify-between">
         {/* home */}
         <div className="home text-white flex flex-col items-center justify-center">
           <i className="ri-home-9-fill text-xl"></i>
