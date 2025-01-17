@@ -15,6 +15,10 @@ const captainSchema = new Schema({
         lowercase: true,
         match: [/.+@.+\..+/, 'Please enter a valid email address']
     },
+    role:{
+        type:String,
+        default:"captain"
+    },
     phoneNumber: {
         type: String,
         required: [true, 'Phone number is required'],

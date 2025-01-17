@@ -2,6 +2,7 @@ const Captain = require('../models/captain.model');
 const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
 const { hashPassword } = require('../services/hashPassword');
+const { generateToken } = require('../services/JWToken'); // Updated import for JWT token generation
 
 // @desc    Register a new captain
 // @route   POST /api/captains/signup
@@ -45,12 +46,8 @@ const registerCaptain = async (req, res) => {
             vehicle
         });
 
-        // Generate JWT token
-        const token = jwt.sign(
-            { id: captain._id },
-            process.env.JWT_SECRET,
-            { expiresIn: '30d' }
-        );
+        // Generate JWT token using the updated function
+        const token = generateToken(captain._id, captain.role);
 
         res.status(201).json({
             message: 'Captain registered successfully',
@@ -59,6 +56,7 @@ const registerCaptain = async (req, res) => {
                 name: captain.name,
                 email: captain.email,
                 phoneNumber: captain.phoneNumber,
+                role:captain.role,
                 drivingLicense: captain.drivingLicense,
                 vehicle: captain.vehicle,
                 isVerified: captain.isVerified,

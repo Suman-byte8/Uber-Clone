@@ -21,6 +21,10 @@ const userSchema = new Schema({
         unique: true,
         match: [/^\+?[1-9]\d{1,14}$/, 'Please enter a valid phone number'] // E.164 format
     },
+    role:{
+        type:String,
+        default:"user"
+    },
     password: {
         type: String,
         required: [true, 'Password is required'],

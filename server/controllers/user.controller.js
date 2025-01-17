@@ -41,8 +41,8 @@ const signup = async (req, res) => {
                 name: user.name,
                 email: user.email,
                 phoneNumber: user.phoneNumber,
-
-                token: generateToken(user._id)
+                role:user.role,
+                token: generateToken(user._id,user.role)
             });
         } else {
             res.status(400).json({
