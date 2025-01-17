@@ -170,7 +170,7 @@ Registers a new captain. Validates inputs, including driving license and vehicle
 
 ---
 
-## Project Structure
+<!-- ## Project Structure
 
 ```
 .
@@ -190,7 +190,7 @@ Registers a new captain. Validates inputs, including driving license and vehicle
 ├── .env                         # Environment variables
 ├── package.json                 # Dependencies and scripts
 └── server.js                    # Entry point of the application
-```
+``` -->
 
 ---
 
@@ -203,6 +203,83 @@ Registers a new captain. Validates inputs, including driving license and vehicle
 5. The `protect` middleware ensures only authenticated users access protected routes.
 
 ---
+
+## Location Route and Controller
+
+The location route and controller handle requests related to location suggestions.
+
+### Location Route
+
+The location route is defined in `server/routes/location.route.js`. It uses the `getSuggestions` controller to fetch location suggestions from the Nominatim OpenStreetMap API. For example, a GET request to `http://localhost:8000/api/locations/suggestions?query=alipurduar%20` will return a list of location suggestions, including details such as place ID, latitude, longitude, address, and bounding box coordinates.
+
+### Location Controller
+
+The location controller is defined in `server/controllers/location.controller.js`. It exports the `getSuggestions` function, which handles GET requests to the `/api/locations/suggestions` endpoint. This function queries the Nominatim OpenStreetMap API with the provided query parameter and returns a list of location suggestions in JSON format.
+
+**Response:**
+```json
+[
+    {
+        "place_id": 222689300,
+        "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+        "osm_type": "node",
+        "osm_id": 568606431,
+        "lat": "26.4851573",
+        "lon": "89.5246926",
+        "class": "place",
+        "type": "city",
+        "place_rank": 16,
+        "importance": 0.4282188878241305,
+        "addresstype": "city",
+        "name": "Alipurduar",
+        "display_name": "Alipurduar, Alipurduar - I, Alipurduar, West Bengal, 736121, India",
+        "address": {
+            "city": "Alipurduar",
+            "county": "Alipurduar - I",
+            "state_district": "Alipurduar",
+            "state": "West Bengal",
+            "ISO3166-2-lvl4": "IN-WB",
+            "postcode": "736121",
+            "country": "India",
+            "country_code": "in"
+        },
+        "boundingbox": [
+            "26.3251573",
+            "26.6451573",
+            "89.3646926",
+            "89.6846926"
+        ]
+    },
+    {
+        "place_id": 223524299,
+        "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+        "osm_type": "relation",
+        "osm_id": 9540776,
+        "lat": "26.62881685",
+        "lon": "89.45378238052393",
+        "class": "boundary",
+        "type": "administrative",
+        "place_rank": 10,
+        "importance": 0.3969391226125017,
+        "addresstype": "state_district",
+        "name": "Alipurduar",
+        "display_name": "Alipurduar, West Bengal, India",
+        "address": {
+            "state_district": "Alipurduar",
+            "state": "West Bengal",
+            "ISO3166-2-lvl4": "IN-WB",
+            "country": "India",
+            "country_code": "in"
+        },
+        "boundingbox": [
+            "26.3953344",
+            "26.8622805",
+            "89.0449223",
+            "89.8826022"
+        ]
+    }
+]
+```
 
 ## License
 
