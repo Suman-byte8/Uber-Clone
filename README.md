@@ -285,6 +285,39 @@ The captain login controller is defined in `server/controllers/captain.controlle
 }
 ```
 
+### User Profile Route and Controller
+
+The user profile route and controller handle requests related to retrieving user account information.
+
+#### User Profile Route
+
+The user profile route is defined in `server/routes/user.route.js`. It uses the `getUserProfile` controller to fetch the user's account details. For example, a GET request to `http://localhost:8000/api/users/account` with a valid JWT token in the Authorization header will return a JSON response with the user's profile information.
+
+#### User Profile Controller
+
+The user profile controller is defined in `server/controllers/user.controller.js`. It exports the `getUserProfile` function, which handles GET requests to the `/api/users/account` endpoint. This function retrieves the user's account details from the database and returns them in the response.
+
+**Request:**
+
+Headers:
+
+```
+Authorization: Bearer <JWT_TOKEN>
+```
+
+**Response:**
+
+```json
+{
+    "_id": "678a930536748191acff0891",
+    "name": "Alice Smith",
+    "email": "alice.smith@example.com",
+    "phoneNumber": "+12345678901"
+}
+```
+
+
+
 ## Location Route and Controller
 
 The location route and controller handle requests related to location suggestions.

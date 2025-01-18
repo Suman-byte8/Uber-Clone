@@ -97,6 +97,28 @@ async function login(req, res) {
     }
 }
 
+// Controller to get account details
+const getAccountDetails = async (req, res) => {
+    try {
+        const userId = req.user._id;
+
+        // Fetch user details (excluding password)
+        const user = await User.findById(userId, 'name email phoneNumber');
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        res.status(200).json(user);
+    } catch (error) {
+        res.status(500).json({
+            message: 'Server error',
+            error: error.message
+        });
+    }
+};
 
 
-module.exports = { signup, login };
+
+
+module.exports = { signup, login, getAccountDetails };

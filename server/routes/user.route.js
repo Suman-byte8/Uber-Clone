@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { check, validationResult } = require('express-validator');
-const { signup, login } = require('../controllers/user.controller');
+const { signup, login, getAccountDetails } = require('../controllers/user.controller');
+const { protect } = require('../middlewares/authMiddleWare');
+
 
 router.post('/signup', [
     // Validation middleware
@@ -68,6 +70,9 @@ router.post('/login', [
     // Call controller function if validation passes
     login(req, res);
 });
+
+// Route for fetching user account details
+router.get('/account', protect, getAccountDetails);
 
 
 
