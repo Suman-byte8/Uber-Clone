@@ -3,6 +3,7 @@ import React from "react";
 const Loader = () => {
   return (
     <div role="status" className="w-screen h-screen flex items-center justify-center">
+        <h1 className="text-xl font-bold">Loading</h1>
       <svg
         aria-hidden="true"
         class="w-8 h-8 text-gray-200 animate-spin dark:text-gray-600 fill-blue-600"
