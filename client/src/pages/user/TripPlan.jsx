@@ -24,7 +24,8 @@ const TripPlan = () => {
     query: "",
     suggestions: [],
     isLoading: false,
-    error: null
+    error: null,
+    isVisible: false
   });
 
   // Panel animation effect
@@ -61,6 +62,12 @@ const TripPlan = () => {
             ease: "power4.inOut",
           });
       }
+
+      // Set dropoff visibility based on panel state
+      setDropoffState(prev => ({
+        ...prev,
+        isVisible: panelState.isOpen
+      }));
     }
   }, [panelState.isOpen]);
 
@@ -163,10 +170,10 @@ const TripPlan = () => {
       >
         <button
           onClick={togglePanel}
-          className="w-full h-10 flex items-center justify-center text-white transition-transform duration-500"
+          className="w-full h-10 flex items-center justify-center text-white transition-transform duration-200"
         >
           <i 
-            className={`ri-arrow-${panelState.isOpen ? 'down' : 'up'}-wide-line text-2xl transform transition-transform duration-500 ${
+            className={`ri-arrow-${panelState.isOpen ? 'down' : 'up'}-wide-line text-2xl transform transition-transform duration-300 ${
               panelState.isOpen ? 'rotate-180' : ''
             }`}
           ></i>
@@ -180,7 +187,7 @@ const TripPlan = () => {
             Set your destination
           </h1>
           <h4 className="text-lg text-center mb-4 transform transition-all duration-500">
-            Enter pickup and dropoff locations
+            Enter pickup and drop off locations
           </h4>
           <hr className="mb-4 opacity-50 transition-opacity duration-500" />
 
@@ -205,49 +212,53 @@ const TripPlan = () => {
               </div>
             </div>
 
-            {/* Dropoff Location */}
-            <div className="relative transform transition-all duration-500">
-              <div className="flex bg-[#343b41] p-3 rounded-xl text-white text-xl hover:bg-[#3a4147] transition-colors duration-300">
-                <i className="ri-flag-line mr-2"></i>
-                <input
-                  type="text"
-                  placeholder="Enter dropoff location"
-                  value={dropoffState.query}
-                  onChange={(e) => debouncedDropoffSearch(e.target.value)}
-                  onFocus={handleInputFocus}
-                  className="bg-transparent w-full outline-none border-0 transition-all duration-300"
-                />
-                {dropoffState.isLoading ? (
-                  <i className="ri-loader-4-line animate-spin"></i>
-                ) : (
-                  <i className="ri-search-line"></i>
-                )}
+            {/* Dropoff Location - Only display if panel is open */}
+            {panelState.isOpen && (
+              <div className={`relative transform transition-all duration-500 ${dropoffState.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+                <div className="flex bg-[#343b41] p-3 rounded-xl text-white text-xl hover:bg-[#3a4147] transition-colors duration-300">
+                  <i className="ri-flag-line mr-2"></i>
+                  <input
+                    type="text"
+                    placeholder="Enter dropoff location"
+                    value={dropoffState.query}
+                    onChange={(e) => debouncedDropoffSearch(e.target.value)}
+                    onFocus={handleInputFocus}
+                    className="bg-transparent w-full outline-none border-0 transition-all duration-300"
+                  />
+                  {dropoffState.isLoading ? (
+                    <i className="ri-loader-4-line animate-spin"></i>
+                  ) : (
+                    <i className="ri-search-line"></i>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Common Suggestions Section */}
-            {(pickupState.suggestions.length > 0 || dropoffState.suggestions.length > 0) && (
-              <div className="common-suggestions-container w-full mt-2 rounded-lg shadow-lg max-h-60 overflow-y-auto z-20 transform transition-all duration-500">
-                {[...pickupState.suggestions, ...dropoffState.suggestions].map((suggestion, index) => (
-                  <div
-                    key={index}
-                    onClick={() => {
-                      if (pickupState.suggestions.includes(suggestion)) {
-                        handleSuggestionSelect(suggestion, setPickupState, '.common-suggestions-container');
-                      } else {
-                        handleSuggestionSelect(suggestion, setDropoffState, '.common-suggestions-container');
-                      }
-                    }}
-                    className="p-3 text-white hover:bg-gray-700 cursor-pointer transition-all duration-300 flex gap-2 text-base"
-                    style={{
-                      transitionDelay: `${index * 50}ms`
-                    }}
-                  >
-                    <i className="ri-map-pin-fill"></i>
-                    {suggestion.display_name}
-                  </div>
-                ))}
-              </div>
+            {/* Common Suggestions Section - Only display if panel is open */}
+            {panelState.isOpen && (
+              (pickupState.suggestions.length > 0 || dropoffState.suggestions.length > 0) && (
+                <div className="common-suggestions-container w-full mt-2 rounded-lg shadow-lg max-h-60 overflow-y-auto z-20 transform transition-all duration-500">
+                  {[...pickupState.suggestions, ...dropoffState.suggestions].map((suggestion, index) => (
+                    <div
+                      key={index}
+                      onClick={() => {
+                        if (pickupState.suggestions.includes(suggestion)) {
+                          handleSuggestionSelect(suggestion, setPickupState, '.common-suggestions-container');
+                        } else {
+                          handleSuggestionSelect(suggestion, setDropoffState, '.common-suggestions-container');
+                        }
+                      }}
+                      className="p-3 text-white hover:bg-gray-700 cursor-pointer transition-all duration-300 flex gap-2 text-base"
+                      style={{
+                        transitionDelay: `${index * 50}ms`
+                      }}
+                    >
+                      <i className="ri-map-pin-fill"></i>
+                      {suggestion.display_name}
+                    </div>
+                  ))}
+                </div>
+              )
             )}
 
             <button 
