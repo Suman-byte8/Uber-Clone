@@ -10,6 +10,9 @@ import AuthPage from "./pages/authentication/AuthPage";
 import UserSignUp from "./pages/user/UserSignUp";
 import CaptainSignUp from "./pages/captain/CaptainSignUp";
 import CaptainHome from "./pages/captain/CaptainHome";
+import UserLogin from "./pages/user/UserLogin";
+import CaptainLogin from "./pages/captain/CaptainLogin";
+import UserAccount from "./pages/user/UserAccount.jsx";
 
 const App = () => {
   return (
@@ -24,6 +27,9 @@ const App = () => {
       <Route path="/user-signup" element={<UserSignUp />} />
       <Route path="/captain-signup" element={<CaptainSignUp />} />
       <Route path="/captain-home" element={<CaptainHome />} />
+      <Route path="/user-login" element={<UserLogin />} />
+      <Route path="/captain-login" element={<CaptainLogin />} />
+      <Route path="/user-account" element={<UserAccount />} />
     </Routes>
   );
 };

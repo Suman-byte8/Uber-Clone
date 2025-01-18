@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 const UserSignUp = () => {
   const [formData, setFormData] = useState({
@@ -34,7 +34,7 @@ const UserSignUp = () => {
 
     try {
       const response = await axios.post(
-        "http://localhost:8000/api/user/signup",
+        `${import.meta.env.VITE_BASE_URL}/api/user/signup`,
         { name, email, phoneNumber, password }
       );
       console.log("Signup successful:", response.data);
@@ -129,6 +129,10 @@ const UserSignUp = () => {
           {isSubmitting ? "Submitting..." : "Sign Up"}
         </button>
       </form>
+
+      <p className="text-sm text-gray-600 mt-6 pb-3">
+                Already have an account? <Link to="/user-login" className="text-blue-500">Login here</Link>.
+            </p>
 
       <p className="text-sm text-gray-600 mt-6 pb-3">
         By proceeding, you agree to Uber's Terms of Service and acknowledge that

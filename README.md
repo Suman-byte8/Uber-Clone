@@ -5,18 +5,21 @@ This project is a backend implementation of user authentication with features in
 ## Features
 
 1. **User Signup**
+
    - Validates user input fields (name, email, phone number, password).
    - Checks for existing users by email or phone number.
    - Hashes passwords before saving to the database.
    - Generates a JWT token upon successful signup.
 
 2. **Captain Signup**
+
    - Validates captain-specific fields like driving license details and vehicle information.
    - Ensures unique email, phone number, and license details.
    - Hashes passwords before saving to the database.
    - Generates a JWT token upon successful signup.
 
 3. **JWT Authentication**
+
    - Protects sensitive routes by verifying JWT tokens.
    - Decodes tokens to fetch user information for authorization.
 
@@ -40,21 +43,25 @@ This project is a backend implementation of user authentication with features in
 ## Installation
 
 1. Clone the repository:
+
    ```bash
    git clone <repository_url>
    ```
 
 2. Navigate to the project directory:
+
    ```bash
    cd user-authentication-api
    ```
 
 3. Install dependencies:
+
    ```bash
    npm install
    ```
 
 4. Create a `.env` file in the root directory and configure the following environment variables:
+
    ```env
    MONGO_URI=<your_mongodb_connection_string>
    JWT_SECRET=<your_jwt_secret>
@@ -77,6 +84,7 @@ This project is a backend implementation of user authentication with features in
 Registers a new user. Validates inputs and generates a JWT token upon success.
 
 **Request Body:**
+
 ```json
 {
   "name": "John Doe",
@@ -87,17 +95,19 @@ Registers a new user. Validates inputs and generates a JWT token upon success.
 ```
 
 **Response:**
+
 ```json
 {
-    "_id": "67892ba437902adc7e3d260c",
-    "name": "John Doe",
-    "email": "johndoe@example.com",
-    "phoneNumber": "1234567890",
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3ODkyYmE0Mzc5MDJhZGM3ZTNkMjYwYyIsImlhdCI6MTczNzA0Mjg1MywiZXhwIjoxNzM5NjM0ODUzfQ.f_Molirs_KFle2HpJrWC2r9hpm4Z-VpzaFxUmRfkJiE"
+  "_id": "67892ba437902adc7e3d260c",
+  "name": "John Doe",
+  "email": "johndoe@example.com",
+  "phoneNumber": "1234567890",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3ODkyYmE0Mzc5MDJhZGM3ZTNkMjYwYyIsImlhdCI6MTczNzA0Mjg1MywiZXhwIjoxNzM5NjM0ODUzfQ.f_Molirs_KFle2HpJrWC2r9hpm4Z-VpzaFxUmRfkJiE"
 }
 ```
 
 **Errors:**
+
 - `400`: Validation errors or existing user.
 - `500`: Server error.
 
@@ -108,51 +118,54 @@ Registers a new user. Validates inputs and generates a JWT token upon success.
 Registers a new captain. Validates inputs, including driving license and vehicle details, and generates a JWT token upon success.
 
 **Request Body:**
+
 ```json
 {
-    "name": "Alice Navigator",
-    "email": "alice.navigator@example.com",
-    "phoneNumber": "+198765432109",
-    "password": "securepassword123",
-    "drivingLicense": {
-        "number": "DL9876543210",
-        "expiryDate": "2035-07-15T00:00:00.000Z"
-    },
-    "vehicle": {
-        "make": "Ford",
-        "model": "Mustang",
-        "year": 2023,
-        "color": "Rapid Red",
-        "licensePlate": "FORD999"
-    }
+  "name": "Alice Navigator",
+  "email": "alice.navigator@example.com",
+  "phoneNumber": "+198765432109",
+  "password": "securepassword123",
+  "drivingLicense": {
+    "number": "DL9876543210",
+    "expiryDate": "2035-07-15T00:00:00.000Z"
+  },
+  "vehicle": {
+    "make": "Ford",
+    "model": "Mustang",
+    "year": 2023,
+    "color": "Rapid Red",
+    "licensePlate": "FORD999"
+  }
 }
 ```
 
 **Response:**
+
 ```json
 {
-    "_id": "67893ce91511e6aef3d0386d",
-    "name": "Alice Navigator",
-    "email": "alice.navigator@example.com",
-    "phoneNumber": "+198765432109",
-    "drivingLicense": {
-        "number": "DL9876543210",
-        "expiryDate": "2035-07-15T00:00:00.000Z"
-    },
-    "vehicle": {
-        "make": "Ford",
-        "model": "Mustang",
-        "year": 2023,
-        "color": "Rapid Red",
-        "licensePlate": "FORD999"
-    },
-    "isVerified": false,
-    "isActive": false,
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3ODkzY2U5MTUxMWU2YWVmM2QwMzg2ZCIsImlhdCI6MTczNzA0NzI3MywiZXhwIjoxNzM5NjM5MjczfQ.KNrHj4vsJFWD9Ebw10YHD-yRidMhwoF5gBiRrOolnUs"
+  "_id": "67893ce91511e6aef3d0386d",
+  "name": "Alice Navigator",
+  "email": "alice.navigator@example.com",
+  "phoneNumber": "+198765432109",
+  "drivingLicense": {
+    "number": "DL9876543210",
+    "expiryDate": "2035-07-15T00:00:00.000Z"
+  },
+  "vehicle": {
+    "make": "Ford",
+    "model": "Mustang",
+    "year": 2023,
+    "color": "Rapid Red",
+    "licensePlate": "FORD999"
+  },
+  "isVerified": false,
+  "isActive": false,
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3ODkzY2U5MTUxMWU2YWVmM2QwMzg2ZCIsImlhdCI6MTczNzA0NzI3MywiZXhwIjoxNzM5NjM5MjczfQ.KNrHj4vsJFWD9Ebw10YHD-yRidMhwoF5gBiRrOolnUs"
 }
 ```
 
 **Errors:**
+
 - `400`: Validation errors or existing captain.
 - `500`: Server error.
 
@@ -204,6 +217,74 @@ Registers a new captain. Validates inputs, including driving license and vehicle
 
 ---
 
+### User Login Route and Controller
+
+The user login route and controller handle requests related to user authentication.
+
+#### User Login Route
+
+The user login route is defined in `server/routes/user.route.js`. It uses the `login` controller to authenticate users. For example, a POST request to `http://localhost:8000/api/users/login` with a JSON body containing the user's email and password will return a JSON response with the user's details and a JWT token.
+
+#### User Login Controller
+
+The user login controller is defined in `server/controllers/user.controller.js`. It exports the `login` function, which handles POST requests to the `/api/users/login` endpoint. This function checks the user's email and password, and if valid, returns a JSON response with the user's details and a JWT token.
+
+**Request:**
+
+```json
+{
+  "email": "alice.smith@example.com",
+  "password": "SecurePassword123!"
+}
+```
+
+**Response:**
+
+```json
+{
+  "_id": "678a59ce816da4cee492e4c7",
+  "message": "User logged in successfully",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3OGE1OWNlODE2ZGE0Y2VlNDkyZTRjNyIsImlhdCI6MTczNzIxMDg1MCwiZXhwIjoxNzM5ODAyODUwfQ.RoCBl2jdNuyRrr6cBvrqhh87N6mazItuIuRE1WgAvbk"
+}
+```
+
+### Captain Login Route and Controller
+
+The captain login route and controller handle requests related to captain authentication.
+
+#### Captain Login Route
+
+The captain login route is defined in `server/routes/captain.route.js`. It uses the `loginCaptain` controller to authenticate captains. For example, a POST request to `http://localhost:8000/api/captains/login` with a JSON body containing the captain's email and password will return a JSON response with the captain's details and a JWT token.
+
+#### Captain Login Controller
+
+The captain login controller is defined in `server/controllers/captain.controller.js`. It exports the `loginCaptain` function, which handles POST requests to the `/api/captains/login` endpoint. This function checks the captain's email and password, and if valid, returns a JSON response with the captain's details and a JWT token.
+
+**Request:**
+
+```json
+{
+  "email": "michael.johnson@example.com",
+  "password": "SecurePassword123!"
+}
+```
+
+**Response:**
+
+```json
+{
+  "message": "Captain logged in successfully",
+  "captain": {
+    "_id": "678bbff1053a1151ca72add5",
+    "name": "Michael Johnson",
+    "email": "michael.johnson@example.com",
+    "phoneNumber": "+12345678901",
+    "role": "captain"
+  },
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3OGJiZmYxMDUzYTExNTFjYTcyYWRkNSIsImlhdCI6MTczNzIxMTk3OSwiZXhwIjoxNzM5ODAzOTc5fQ.eNvy_LTyUZWIli5t2aM-MV1iQuxOlrfp9wo0cQWW8B8"
+}
+```
+
 ## Location Route and Controller
 
 The location route and controller handle requests related to location suggestions.
@@ -217,67 +298,58 @@ The location route is defined in `server/routes/location.route.js`. It uses the 
 The location controller is defined in `server/controllers/location.controller.js`. It exports the `getSuggestions` function, which handles GET requests to the `/api/locations/suggestions` endpoint. This function queries the Nominatim OpenStreetMap API with the provided query parameter and returns a list of location suggestions in JSON format.
 
 **Response:**
+
 ```json
 [
-    {
-        "place_id": 222689300,
-        "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
-        "osm_type": "node",
-        "osm_id": 568606431,
-        "lat": "26.4851573",
-        "lon": "89.5246926",
-        "class": "place",
-        "type": "city",
-        "place_rank": 16,
-        "importance": 0.4282188878241305,
-        "addresstype": "city",
-        "name": "Alipurduar",
-        "display_name": "Alipurduar, Alipurduar - I, Alipurduar, West Bengal, 736121, India",
-        "address": {
-            "city": "Alipurduar",
-            "county": "Alipurduar - I",
-            "state_district": "Alipurduar",
-            "state": "West Bengal",
-            "ISO3166-2-lvl4": "IN-WB",
-            "postcode": "736121",
-            "country": "India",
-            "country_code": "in"
-        },
-        "boundingbox": [
-            "26.3251573",
-            "26.6451573",
-            "89.3646926",
-            "89.6846926"
-        ]
+  {
+    "place_id": 222689300,
+    "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+    "osm_type": "node",
+    "osm_id": 568606431,
+    "lat": "26.4851573",
+    "lon": "89.5246926",
+    "class": "place",
+    "type": "city",
+    "place_rank": 16,
+    "importance": 0.4282188878241305,
+    "addresstype": "city",
+    "name": "Alipurduar",
+    "display_name": "Alipurduar, Alipurduar - I, Alipurduar, West Bengal, 736121, India",
+    "address": {
+      "city": "Alipurduar",
+      "county": "Alipurduar - I",
+      "state_district": "Alipurduar",
+      "state": "West Bengal",
+      "ISO3166-2-lvl4": "IN-WB",
+      "postcode": "736121",
+      "country": "India",
+      "country_code": "in"
     },
-    {
-        "place_id": 223524299,
-        "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
-        "osm_type": "relation",
-        "osm_id": 9540776,
-        "lat": "26.62881685",
-        "lon": "89.45378238052393",
-        "class": "boundary",
-        "type": "administrative",
-        "place_rank": 10,
-        "importance": 0.3969391226125017,
-        "addresstype": "state_district",
-        "name": "Alipurduar",
-        "display_name": "Alipurduar, West Bengal, India",
-        "address": {
-            "state_district": "Alipurduar",
-            "state": "West Bengal",
-            "ISO3166-2-lvl4": "IN-WB",
-            "country": "India",
-            "country_code": "in"
-        },
-        "boundingbox": [
-            "26.3953344",
-            "26.8622805",
-            "89.0449223",
-            "89.8826022"
-        ]
-    }
+    "boundingbox": ["26.3251573", "26.6451573", "89.3646926", "89.6846926"]
+  },
+  {
+    "place_id": 223524299,
+    "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+    "osm_type": "relation",
+    "osm_id": 9540776,
+    "lat": "26.62881685",
+    "lon": "89.45378238052393",
+    "class": "boundary",
+    "type": "administrative",
+    "place_rank": 10,
+    "importance": 0.3969391226125017,
+    "addresstype": "state_district",
+    "name": "Alipurduar",
+    "display_name": "Alipurduar, West Bengal, India",
+    "address": {
+      "state_district": "Alipurduar",
+      "state": "West Bengal",
+      "ISO3166-2-lvl4": "IN-WB",
+      "country": "India",
+      "country_code": "in"
+    },
+    "boundingbox": ["26.3953344", "26.8622805", "89.0449223", "89.8826022"]
+  }
 ]
 ```
 

@@ -161,7 +161,7 @@ const UserHome = () => {
       </div>
 
       {/* nav footer */}
-      <div className="footer-nav w-screen p-4 py-6 border-t-2 white fixed h-[4rem] bg-[#2A3335] bottom-0 left-0 flex items-center justify-between">
+      <div className="footer-nav w-screen p-4 py-6 border-t-2 white fixed h-[4rem] bg-[#2A3335] bottom-0 left-0 flex items-center justify-between rounded-t-xl">
         {/* home */}
         <div className="home text-white flex flex-col items-center justify-center">
           <i className="ri-home-9-fill text-xl"></i>
@@ -181,10 +181,10 @@ const UserHome = () => {
         </div>
 
         {/* account */}
-        <div className="home text-white flex flex-col items-center justify-center">
+        <Link to='/user-account' className="home text-white flex flex-col items-center justify-center">
           <i className="ri-user-fill text-xl"></i>
           <p className="text-md font-medium">Account</p>
-        </div>
+        </Link>
       </div>
     </div>
   );

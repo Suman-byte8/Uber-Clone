@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { check, validationResult } = require('express-validator');
-const { signup } = require('../controllers/user.controller');
+const { signup, login } = require('../controllers/user.controller');
 
 router.post('/signup', [
     // Validation middleware
@@ -42,6 +42,33 @@ router.post('/signup', [
     // Call controller function if validation passes
     signup(req, res);
 });
+
+router.post('/login', [
+    // Validation middleware
+    check('email')
+        .trim()
+        .notEmpty()
+        .withMessage('Email is required')
+        .isEmail()
+        .withMessage('Please provide a valid email'),
+    check('password')
+        .trim()
+        .notEmpty()
+        .withMessage('Password is required')
+], async (req, res) => {
+    // Check for validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({
+            message: 'Validation failed',
+            errors: errors.array()
+        });
+    }
+
+    // Call controller function if validation passes
+    login(req, res);
+});
+
 
 
 module.exports = router
