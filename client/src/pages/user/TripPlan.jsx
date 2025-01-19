@@ -95,6 +95,8 @@ const TripPlan = () => {
   };
 
   const fetchSuggestions = async (value, setState) => {
+    console.log("Fetching suggestions for:", value);
+
     setState((prev) => ({
       ...prev,
       query: value,
@@ -112,8 +114,11 @@ const TripPlan = () => {
 
     try {
       const response = await axios.get(
-        `${import.meta.VITE_BASE_URL}/api/locations/suggestions?query=${value}`
+        `${
+          import.meta.env.VITE_BASE_URL
+        }/api/locations/suggestions?query=${value}`
       );
+
       setState((prev) => ({
         ...prev,
         suggestions: response.data,
@@ -121,6 +126,7 @@ const TripPlan = () => {
         error: null,
       }));
     } catch (error) {
+      console.error("Error fetching suggestions:", error);
       setState((prev) => ({
         ...prev,
         suggestions: [],
@@ -176,10 +182,9 @@ const TripPlan = () => {
       </button>
 
       {/* <img src={tempMap} alt="Map" className="h-full w-full object-cover" /> // temporary map image */}
-      
-      <div className="h-full w-full -z-10">
 
-      <LivePosition />
+      <div className="h-full w-full -z-10">
+        <LivePosition />
       </div>
 
       <div

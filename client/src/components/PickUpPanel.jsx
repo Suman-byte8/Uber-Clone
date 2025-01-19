@@ -36,7 +36,7 @@ const PickUpPanel = ({
                 type="text"
                 placeholder="Enter pickup location"
                 value={pickupState.query}
-                onChange={(e) => debouncedPickupSearch(e.target.value)} // Use debounced function
+                onChange={(e) => handlePickupSearch(e.target.value)} // Use debounced function
                 onFocus={handleInputFocus}
                 className="bg-transparent w-full outline-none border-0 transition-all duration-800"
               />
@@ -63,7 +63,7 @@ const PickUpPanel = ({
                   type="text"
                   placeholder="Enter dropoff location"
                   value={dropoffState.query}
-                  onChange={(e) => debouncedDropoffSearch(e.target.value)} // Use debounced function
+                  onChange={(e) => handleDropoffSearch(e.target.value)} // Use debounced function
                   onFocus={handleInputFocus}
                   className="bg-transparent w-full outline-none border-0 transition-all duration-800"
                 />
