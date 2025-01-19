@@ -10,9 +10,10 @@ import AuthPage from "./pages/authentication/AuthPage";
 import UserSignUp from "./pages/user/UserSignUp";
 import CaptainSignUp from "./pages/captain/CaptainSignUp";
 import CaptainHome from "./pages/captain/CaptainHome";
-import UserLogin from "./pages/user/UserLogin";
 import CaptainLogin from "./pages/captain/CaptainLogin";
 import UserAccount from "./pages/user/UserAccount.jsx";
+import LivePosition from "./components/LivePosition.jsx";
+import UserLogin from "./pages/user/UserLogin";
 
 const App = () => {
   return (

@@ -21,35 +21,27 @@ const userSchema = new Schema({
         unique: true,
         match: [/^\+?[1-9]\d{1,14}$/, 'Please enter a valid phone number'] // E.164 format
     },
-    role:{
-        type:String,
-        default:"user"
+    role: {
+        type: String,
+        default: "user"
     },
     password: {
         type: String,
         required: [true, 'Password is required'],
         minlength: [8, 'Password must be at least 8 characters long']
     },
-    // location: {
-    //     lat: { type: Number, required: true }, // Latitude
-    //     lng: { type: Number, required: true }  // Longitude
-    // },
-    // // profilePicture: {
+    location: {
+        lat: { type: Number, }, // Latitude
+        lng: { type: Number, }  // Longitude
+    },
+    // profilePicture: {
     //     type: String, // URL for the profile picture
     //     default: 'https://example.com/default-avatar.png'
     // },
-    // rides: [
-    //     { type: Schema.Types.ObjectId, ref: 'Ride' } // Reference to rides the user has taken
-    // ],
+    rides: [
+        { type: Schema.Types.ObjectId, ref: 'Ride' } // Reference to rides the user has taken
+    ],
 
-    vehicleDetails: {
-        type: {
-            make: { type: String, required: false }, // Vehicle make (e.g., Toyota)
-            model: { type: String, required: false }, // Vehicle model (e.g., Corolla)
-            plateNumber: { type: String, required: false } // License plate number
-        },
-        required: function () { return this.isDriver; } // Only required if the user is a driver
-    },
     createdAt: {
         type: Date,
         default: Date.now

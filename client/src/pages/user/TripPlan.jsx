@@ -3,78 +3,86 @@ import tempMap from "../../assets/temp_map.png";
 import gsap from "gsap";
 import axios from "axios";
 
+import PickUpPanel from "../../components/PickUpPanel";
+import LivePosition from "../../components/LivePosition";
+
 const TripPlan = () => {
   const panelRef = useRef(null);
   const contentRef = useRef(null);
   const [panelState, setPanelState] = useState({
     isOpen: false,
-    height: "50vh",
-    fullHeight: "100vh"
+    height: "auto",
+    fullHeight: "100vh",
+    paddingBottom: "3rem",
   });
-  
-  // Separate states for pickup and dropoff
+
   const [pickupState, setPickupState] = useState({
     query: "",
     suggestions: [],
     isLoading: false,
-    error: null
+    error: null,
   });
-  
+
   const [dropoffState, setDropoffState] = useState({
     query: "",
     suggestions: [],
     isLoading: false,
     error: null,
-    isVisible: false
+    isVisible: false,
   });
 
-  // Panel animation effect
+  // Enhanced panel animation effect with slower closing
   useEffect(() => {
     if (panelRef.current && contentRef.current) {
       const timeline = gsap.timeline({
         defaults: {
           ease: "power2.inOut",
-          duration: 0.3
-        }
+        },
       });
 
       if (panelState.isOpen) {
+        // Opening animation
         timeline
           .to(panelRef.current, {
             height: panelState.fullHeight,
-            duration: 0.1,
+            duration: 0.3,
+            ease: "power2.out",
           })
           .to(contentRef.current, {
             opacity: 1,
             y: 0,
-            duration: 0.1,
-            delay: -0.3
+            duration: 0.2,
+            delay: -0.1,
           });
       } else {
+        // Closing animation - slower and smoother
         timeline
           .to(contentRef.current, {
-            y: 20,
-            duration: 0.4
+            opacity: 0.8,
+            y: 10,
+            duration: 0.4,
+            ease: "power2.inOut",
           })
           .to(panelRef.current, {
             height: panelState.height,
-            duration: 0.1,
-            ease: "power4.inOut",
+            duration: 0.6, // Increased duration for closing
+            ease: "power4.inOut", // Smoother easing for closing
+            paddingBottom: panelState.paddingBottom,
           });
       }
 
-      // Set dropoff visibility based on panel state
-      setDropoffState(prev => ({
+      setDropoffState((prev) => ({
         ...prev,
-        isVisible: panelState.isOpen
+        isVisible: panelState.isOpen,
       }));
     }
   }, [panelState.isOpen]);
 
+  // Rest of your code remains the same...
   const togglePanel = () => {
-    setPanelState(prev => ({
+    setPanelState((prev) => ({
       ...prev,
-      isOpen: !prev.isOpen
+      isOpen: !prev.isOpen,
     }));
   };
 
@@ -86,48 +94,49 @@ const TripPlan = () => {
     };
   };
 
-  // Generic function to fetch suggestions
   const fetchSuggestions = async (value, setState) => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       query: value,
-      isLoading: true
+      isLoading: true,
     }));
 
     if (value.length < 3) {
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         suggestions: [],
-        isLoading: false
+        isLoading: false,
       }));
       return;
     }
 
     try {
-      const response = await axios.get(`http://localhost:8000/api/locations/suggestions?query=${value}`);
-      setState(prev => ({
+      const response = await axios.get(
+        `${import.meta.VITE_BASE_URL}/api/locations/suggestions?query=${value}`
+      );
+      setState((prev) => ({
         ...prev,
         suggestions: response.data,
         isLoading: false,
-        error: null
+        error: null,
       }));
     } catch (error) {
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         suggestions: [],
         isLoading: false,
-        error: "Failed to fetch suggestions"
+        error: "Failed to fetch suggestions",
       }));
     }
   };
 
   const handlePickupSearch = (value) => fetchSuggestions(value, setPickupState);
-  const handleDropoffSearch = (value) => fetchSuggestions(value, setDropoffState);
+  const handleDropoffSearch = (value) =>
+    fetchSuggestions(value, setDropoffState);
 
-  const debouncedPickupSearch = debounce(handlePickupSearch, 300);
   const debouncedDropoffSearch = debounce(handleDropoffSearch, 300);
+  const debouncedPickupSearch = debounce(handlePickupSearch, 300);
 
-  // Generic function to handle suggestion selection
   const handleSuggestionSelect = (suggestion, setState, containerClass) => {
     gsap.to(containerClass, {
       opacity: 0,
@@ -135,20 +144,24 @@ const TripPlan = () => {
       duration: 0.3,
       ease: "power2.inOut",
       onComplete: () => {
-        setState(prev => ({
-          ...prev,
-          query: suggestion.display_name,
-          suggestions: []
-        }));
-      }
+        if (typeof setState === "function") {
+          setState((prev) => ({
+            ...prev,
+            query: suggestion.display_name,
+            suggestions: [],
+          }));
+        } else {
+          console.error("setState is not a function", setState);
+        }
+      },
     });
   };
 
   const handleInputFocus = () => {
     if (!panelState.isOpen) {
-      setPanelState(prev => ({
+      setPanelState((prev) => ({
         ...prev,
-        isOpen: true
+        isOpen: true,
       }));
     }
   };
@@ -162,113 +175,44 @@ const TripPlan = () => {
         <i className="ri-arrow-left-line text-3xl"></i>
       </button>
 
-      <img src={tempMap} alt="Map" className="h-full w-full object-cover" />
+      {/* <img src={tempMap} alt="Map" className="h-full w-full object-cover" /> // temporary map image */}
+      
+      <div className="h-full w-full -z-10">
+
+      <LivePosition />
+      </div>
 
       <div
         ref={panelRef}
-        className="w-full p-2 absolute bottom-0 bg-[#252525] rounded-t-xl transition-all duration-700 z-10"
+        className={`w-full p-2 absolute bottom-0 bg-[#252525] rounded-t-xl transition-all duration-700 z-10 ${
+          panelState.isOpen ? "h-full" : "pb-12"
+        }`}
       >
         <button
           onClick={togglePanel}
           className="w-full h-10 flex items-center justify-center text-white transition-transform duration-200"
         >
-          <i 
-            className={`ri-arrow-${panelState.isOpen ? 'down' : 'up'}-wide-line text-2xl transform transition-transform duration-300 ${
-              panelState.isOpen ? 'rotate-180' : ''
+          <i
+            className={`ri-arrow-${
+              panelState.isOpen ? "down" : "up"
+            }-wide-line text-2xl transform transition-transform duration-300 ${
+              panelState.isOpen ? "rotate-180" : ""
             }`}
           ></i>
         </button>
 
-        <div 
-          ref={contentRef}
-          className="text-white px-4 transition-all duration-500"
-        >
-          <h1 className="text-2xl font-medium text-center mb-2 transform transition-all duration-500">
-            Set your destination
-          </h1>
-          <h4 className="text-lg text-center mb-4 transform transition-all duration-500">
-            Enter pickup and drop off locations
-          </h4>
-          <hr className="mb-4 opacity-50 transition-opacity duration-500" />
-
-          <div className="flex flex-col gap-4">
-            {/* Pickup Location */}
-            <div className="relative transform transition-all duration-500">
-              <div className="flex bg-[#343b41] p-3 rounded-xl text-white text-xl hover:bg-[#3a4147] transition-colors duration-300">
-                <i className="ri-map-pin-line mr-2"></i>
-                <input
-                  type="text"
-                  placeholder="Enter pickup location"
-                  value={pickupState.query}
-                  onChange={(e) => debouncedPickupSearch(e.target.value)}
-                  onFocus={handleInputFocus}
-                  className="bg-transparent w-full outline-none border-0 transition-all duration-300"
-                />
-                {pickupState.isLoading ? (
-                  <i className="ri-loader-4-line animate-spin"></i>
-                ) : (
-                  <i className="ri-search-line"></i>
-                )}
-              </div>
-            </div>
-
-            {/* Dropoff Location - Only display if panel is open */}
-            {panelState.isOpen && (
-              <div className={`relative transform transition-all duration-500 ${dropoffState.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-                <div className="flex bg-[#343b41] p-3 rounded-xl text-white text-xl hover:bg-[#3a4147] transition-colors duration-300">
-                  <i className="ri-flag-line mr-2"></i>
-                  <input
-                    type="text"
-                    placeholder="Enter dropoff location"
-                    value={dropoffState.query}
-                    onChange={(e) => debouncedDropoffSearch(e.target.value)}
-                    onFocus={handleInputFocus}
-                    className="bg-transparent w-full outline-none border-0 transition-all duration-300"
-                  />
-                  {dropoffState.isLoading ? (
-                    <i className="ri-loader-4-line animate-spin"></i>
-                  ) : (
-                    <i className="ri-search-line"></i>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Common Suggestions Section - Only display if panel is open */}
-            {panelState.isOpen && (
-              (pickupState.suggestions.length > 0 || dropoffState.suggestions.length > 0) && (
-                <div className="common-suggestions-container w-full mt-2 rounded-lg shadow-lg max-h-60 overflow-y-auto z-20 transform transition-all duration-500">
-                  {[...pickupState.suggestions, ...dropoffState.suggestions].map((suggestion, index) => (
-                    <div
-                      key={index}
-                      onClick={() => {
-                        if (pickupState.suggestions.includes(suggestion)) {
-                          handleSuggestionSelect(suggestion, setPickupState, '.common-suggestions-container');
-                        } else {
-                          handleSuggestionSelect(suggestion, setDropoffState, '.common-suggestions-container');
-                        }
-                      }}
-                      className="p-3 text-white hover:bg-gray-700 cursor-pointer transition-all duration-300 flex gap-2 text-base"
-                      style={{
-                        transitionDelay: `${index * 50}ms`
-                      }}
-                    >
-                      <i className="ri-map-pin-fill"></i>
-                      {suggestion.display_name}
-                    </div>
-                  ))}
-                </div>
-              )
-            )}
-
-            <button 
-              className="bg-gray-300 w-full p-3 rounded-xl text-xl font-medium text-gray-800 hover:bg-gray-400 transition-all duration-500 hover:scale-[1.02] active:scale-[0.98]"
-              onClick={() => {/* Add confirmation logic */}}
-            >
-              Confirm Trip
-            </button>
-          </div>
-        </div>
+        <PickUpPanel
+          contentRef={contentRef}
+          panelState={panelState}
+          pickupState={pickupState}
+          dropoffState={dropoffState}
+          handlePickupSearch={debouncedPickupSearch}
+          handleDropoffSearch={debouncedDropoffSearch}
+          handleInputFocus={handleInputFocus}
+          handleSuggestionSelect={handleSuggestionSelect}
+          setPickupState={setPickupState}
+          setDropoffState={setDropoffState}
+        />
       </div>
     </div>
   );
