@@ -1,5 +1,4 @@
 import React, { useRef, useState, useEffect } from "react";
-import tempMap from "../../assets/temp_map.png";
 import gsap from "gsap";
 import axios from "axios";
 
@@ -224,3 +223,5 @@ const TripPlan = () => {
 };
 
 export default TripPlan;
+
+

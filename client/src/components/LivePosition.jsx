@@ -65,7 +65,7 @@ const LivePosition = () => {
         center={
           location ? [location.lat, location.lon] : [25.0057449, 88.1398483]
         } // Default fallback location
-        zoom={20}
+        zoom={15}
         style={{ height: "100vh", width: "100%", zIndex: 1 }} // Set z-index for the map container
         whenCreated={setMap} // Set the map instance when created
         scrollWheelZoom={true}
