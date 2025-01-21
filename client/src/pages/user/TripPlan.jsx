@@ -5,6 +5,7 @@ import axios from "axios";
 import LivePosition from "../../components/LivePosition";
 import PickUpPanel from "../../components/PickUpPanel";
 import { useUserContext } from "../../components/UserContext";
+import ChooseRidePanel from "../../components/ChooseRidePanel";
 
 const debounce = (func, delay) => {
   let timer;
@@ -22,7 +23,7 @@ const TripPlan = () => {
   const contentRef = useRef(null);
   const [panelState, setPanelState] = useState({
     isOpen: false,
-    height: "auto",
+    height: "160px",
     fullHeight: "100vh",
     paddingBottom: "3rem",
   });
@@ -33,7 +34,7 @@ const TripPlan = () => {
     query: "",
     suggestions: [],
     isLoading: false,
-    active: false,
+    active: true,
     error: null,
   });
 
@@ -47,6 +48,8 @@ const TripPlan = () => {
   });
 
   const [location, setLocation] = useState();
+
+  const [showChooseRidePanel, setShowChooseRidePanel] = useState(false);
 
   const fetchSuggestions = async (query, setState) => {
     if (!query.trim()) return;
@@ -198,6 +201,14 @@ const TripPlan = () => {
     }
   };
 
+  const handleConfirmTrip = () => {
+    console.log("Confirm Trip clicked"); // Debug log
+    setPanelState((prev) => ({ ...prev, isOpen: false }));
+    setShowChooseRidePanel(true);
+  };
+
+  console.log("Show Choose Ride Panel:", showChooseRidePanel); // Debug log
+
   return (
     <div className="relative h-screen w-full">
       <button
@@ -240,8 +251,12 @@ const TripPlan = () => {
           handleDropoffSearch={handleDropoffSearch}
           handleSuggestionSelect={handleSuggestionSelect}
           activeInput={activeInput}
+          onConfirmTrip={handleConfirmTrip}
+          setDropoffState={setDropoffState}
         />
       </div>
+
+      {showChooseRidePanel && <ChooseRidePanel />}
     </div>
   );
 };

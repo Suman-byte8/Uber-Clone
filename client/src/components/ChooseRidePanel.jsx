@@ -2,7 +2,7 @@ import React from "react";
 
 const ChooseRidePanel = () => {
   return (
-    <div className="p-2 w-screen flex flex-col items-center">
+    <div className="p-2 w-screen flex flex-col items-center z-10 h-full">
       <h4 className="w-full text-sm text-center pb-4 border-b-2 border-gray-300">
         Choose a ride, or swipe up for more
       </h4>

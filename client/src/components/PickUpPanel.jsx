@@ -8,6 +8,8 @@ const PickUpPanel = ({
     handleInputFocus,
     handleSuggestionSelect,
     activeInput,
+    onConfirmTrip,
+    setDropoffState,
   }) => {
     return (
       <div
@@ -104,7 +106,7 @@ const PickUpPanel = ({
           <button
             className="bg-gray-300 w-full p-3 rounded-xl text-xl font-medium text-gray-800 hover:bg-gray-400 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
             onClick={() => {
-              /* Add confirmation logic */
+              onConfirmTrip();
             }}
           >
             Confirm Trip
