@@ -1,8 +1,10 @@
 import React, { useState } from "react";
+import { useUserContext } from "../../components/UserContext"; // Import UserContext
 import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
 
 const CaptainSignUp = () => {
+  const { setCaptainId } = useUserContext(); // Access setCaptainId from context
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -22,7 +24,6 @@ const CaptainSignUp = () => {
     },
   });
   const [error, setError] = useState("");
-  // const [success, setSuccess] = useState('');
 
   const navigate = useNavigate();
 
@@ -78,6 +79,10 @@ const CaptainSignUp = () => {
       );
 
       if (response.status) {
+        const captainId = response.data._id;
+        setCaptainId(captainId); // Set captainId in context
+        localStorage.setItem("captainId", captainId); // Store captainId in local storage
+
         navigate("/captain-home");
       } // Handle successful signup (e.g., redirect or show a success message)
     } catch (error) {

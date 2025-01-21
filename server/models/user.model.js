@@ -30,9 +30,17 @@ const userSchema = new Schema({
         required: [true, 'Password is required'],
         minlength: [8, 'Password must be at least 8 characters long']
     },
-    location: {
-        lat: { type: Number, }, // Latitude
-        lng: { type: Number, }  // Longitude
+    currentLocation: {
+        lat: {
+            type: Number,
+            required: true,
+            default: 0
+        }, // Latitude
+        lon: {
+            type: Number,
+            required: true,
+            default: 0
+        },  // Longitude
     },
     // profilePicture: {
     //     type: String, // URL for the profile picture

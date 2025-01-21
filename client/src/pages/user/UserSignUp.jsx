@@ -1,8 +1,11 @@
 import React, { useState } from "react";
 import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
+import { useUserContext } from "../../components/UserContext"; // Import UserContext
+ // Import UserContext
 
 const UserSignUp = () => {
+  const { setUserId } = useUserContext(); // Access setUserId from context
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -38,10 +41,12 @@ const UserSignUp = () => {
         { name, email, phoneNumber, password }
       );
       console.log("Signup successful:", response.data);
-      if(response.status==201){
-        const token = response.data.token;
-        localStorage.setItem("userToken", token);
-        navigate('/user-home')
+      if (response.status === 201) {
+        const userId = response.data._id; // Get user ID from response
+        setUserId(userId); // Set userId in context
+        localStorage.setItem("userToken", response.data.token);
+        localStorage.setItem("userId", userId); // Store userId in local storage
+        navigate('/user-home');
       }
       // Handle success (e.g., redirect or success message)
     } catch (err) {
@@ -131,8 +136,8 @@ const UserSignUp = () => {
       </form>
 
       <p className="text-sm text-gray-600 mt-6 pb-3">
-                Already have an account? <Link to="/user-login" className="text-blue-500">Login here</Link>.
-            </p>
+        Already have an account? <Link to="/user-login" className="text-blue-500">Login here</Link>.
+      </p>
 
       <p className="text-sm text-gray-600 mt-6 pb-3">
         By proceeding, you agree to Uber's Terms of Service and acknowledge that

@@ -1,8 +1,11 @@
 import React, { useState } from "react";
 import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
+import { useUserContext } from "../../components/UserContext"; // Import UserContext
+// Import UserContext
 
 const CaptainLogin = () => {
+  const { setCaptainId } = useUserContext(); // Access setCaptainId from context
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -23,8 +26,10 @@ const CaptainLogin = () => {
       );
 
       setSuccess("Login successful!");
-      // Optionally store the token in local storage or context
+      const captainId = response.data._id; // Get captain ID from response
+      setCaptainId(captainId); // Set captainId in context
       localStorage.setItem("token", response.data.token);
+      localStorage.setItem("captainId", captainId); // Store captainId in local storage
       navigate("/captain-home"); // Redirect to captain home page
     } catch (error) {
       console.error("Error logging in:", error);

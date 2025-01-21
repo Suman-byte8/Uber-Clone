@@ -1,11 +1,15 @@
+// TripPlan.jsx
 import React, { useRef, useState, useEffect } from "react";
 import gsap from "gsap";
 import axios from "axios";
-
-import PickUpPanel from "../../components/PickUpPanel";
 import LivePosition from "../../components/LivePosition";
+import PickUpPanel from "../../components/PickUpPanel";
+import { useUserContext } from "../../components/UserContext";
+import { useNavigate } from "react-router-dom";
 
 const TripPlan = () => {
+  const { userId } = useUserContext();
+  const navigate = useNavigate();
   const panelRef = useRef(null);
   const contentRef = useRef(null);
   const [panelState, setPanelState] = useState({
@@ -30,136 +34,103 @@ const TripPlan = () => {
     isVisible: false,
   });
 
-  // Enhanced panel animation effect with slower closing
-  useEffect(() => {
-    if (panelRef.current && contentRef.current) {
-      const timeline = gsap.timeline({
-        defaults: {
-          ease: "power2.inOut",
-        },
-      });
+  const [location, setLocation] = useState();
 
-      if (panelState.isOpen) {
-        // Opening animation
-        timeline
-          .to(panelRef.current, {
-            height: panelState.fullHeight,
-            duration: 0.3,
-            ease: "power2.out",
-          })
-          .to(contentRef.current, {
-            opacity: 1,
-            y: 0,
-            duration: 0.2,
-            delay: -0.1,
-          });
-      } else {
-        // Closing animation - slower and smoother
-        timeline
-          .to(contentRef.current, {
-            opacity: 0.8,
-            y: 10,
-            duration: 0.4,
-            ease: "power2.inOut",
-          })
-          .to(panelRef.current, {
-            height: panelState.height,
-            duration: 0.6, // Increased duration for closing
-            ease: "power4.inOut", // Smoother easing for closing
-            paddingBottom: panelState.paddingBottom,
-          });
-      }
-
-      setDropoffState((prev) => ({
-        ...prev,
-        isVisible: panelState.isOpen,
-      }));
+  const fetchAndUpdateLocation = () => {
+    if (!navigator.geolocation) {
+      console.error("Geolocation is not supported by this browser.");
+      return;
     }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const currentLocation = {
+          lat: position.coords.latitude,
+          lon: position.coords.longitude,
+        };
+        setLocation(currentLocation);
+
+        if (!userId) {
+          console.error("User ID is not available.");
+          navigate("/user-login");
+          return;
+        }
+
+        try {
+          const response = await axios.put(
+            `${import.meta.env.VITE_BASE_URL}/api/locations/update-location`,
+            {
+              lat: currentLocation.lat,
+              lon: currentLocation.lon,
+              userId,
+            }
+          );
+          console.log("Location updated successfully:", response.data);
+        } catch (error) {
+          console.error(
+            "Error updating user location:",
+            error.response?.data || error.message
+          );
+        }
+      },
+      (error) => {
+        console.error("Error fetching location:", error);
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+    );
+  };
+
+  useEffect(() => {
+    fetchAndUpdateLocation();
+  }, []);
+
+  useEffect(() => {
+    if (!panelRef.current || !contentRef.current) return;
+
+    const timeline = gsap.timeline({
+      defaults: { ease: "power2.inOut" },
+    });
+
+    if (panelState.isOpen) {
+      timeline
+        .to(panelRef.current, {
+          height: panelState.fullHeight,
+          duration: 0.3,
+          ease: "power2.out",
+        })
+        .to(contentRef.current, {
+          opacity: 1,
+          y: 0,
+          duration: 0.2,
+          delay: -0.1,
+        });
+    } else {
+      timeline
+        .to(contentRef.current, {
+          opacity: 0.8,
+          y: 10,
+          duration: 0.4,
+          ease: "power2.inOut",
+        })
+        .to(panelRef.current, {
+          height: panelState.height,
+          duration: 0.6,
+          ease: "power4.inOut",
+          paddingBottom: panelState.paddingBottom,
+        });
+    }
+
+    setDropoffState((prev) => ({
+      ...prev,
+      isVisible: panelState.isOpen,
+    }));
   }, [panelState.isOpen]);
 
-  // Rest of your code remains the same...
   const togglePanel = () => {
     setPanelState((prev) => ({
       ...prev,
       isOpen: !prev.isOpen,
     }));
-  };
-
-  const debounce = (func, wait) => {
-    let timeout;
-    return (...args) => {
-      clearTimeout(timeout);
-      timeout = setTimeout(() => func.apply(this, args), wait);
-    };
-  };
-
-  const fetchSuggestions = async (value, setState) => {
-    console.log("Fetching suggestions for:", value);
-
-    setState((prev) => ({
-      ...prev,
-      query: value,
-      isLoading: true,
-    }));
-
-    if (value.length < 3) {
-      setState((prev) => ({
-        ...prev,
-        suggestions: [],
-        isLoading: false,
-      }));
-      return;
-    }
-
-    try {
-      const response = await axios.get(
-        `${
-          import.meta.env.VITE_BASE_URL
-        }/api/locations/suggestions?query=${value}`
-      );
-
-      setState((prev) => ({
-        ...prev,
-        suggestions: response.data,
-        isLoading: false,
-        error: null,
-      }));
-    } catch (error) {
-      console.error("Error fetching suggestions:", error);
-      setState((prev) => ({
-        ...prev,
-        suggestions: [],
-        isLoading: false,
-        error: "Failed to fetch suggestions",
-      }));
-    }
-  };
-
-  const handlePickupSearch = (value) => fetchSuggestions(value, setPickupState);
-  const handleDropoffSearch = (value) =>
-    fetchSuggestions(value, setDropoffState);
-
-  const debouncedDropoffSearch = debounce(handleDropoffSearch, 300);
-  const debouncedPickupSearch = debounce(handlePickupSearch, 300);
-
-  const handleSuggestionSelect = (suggestion, setState, containerClass) => {
-    gsap.to(containerClass, {
-      opacity: 0,
-      y: -10,
-      duration: 0.3,
-      ease: "power2.inOut",
-      onComplete: () => {
-        if (typeof setState === "function") {
-          setState((prev) => ({
-            ...prev,
-            query: suggestion.display_name,
-            suggestions: [],
-          }));
-        } else {
-          console.error("setState is not a function", setState);
-        }
-      },
-    });
   };
 
   const handleInputFocus = () => {
@@ -180,10 +151,8 @@ const TripPlan = () => {
         <i className="ri-arrow-left-line text-3xl"></i>
       </button>
 
-      {/* <img src={tempMap} alt="Map" className="h-full w-full object-cover" /> // temporary map image */}
-
-      <div className="h-full w-full -z-10">
-        <LivePosition />
+      <div className="h-full w-full z-[1]">
+        <LivePosition location={location} />
       </div>
 
       <div
@@ -210,10 +179,7 @@ const TripPlan = () => {
           panelState={panelState}
           pickupState={pickupState}
           dropoffState={dropoffState}
-          handlePickupSearch={debouncedPickupSearch}
-          handleDropoffSearch={debouncedDropoffSearch}
           handleInputFocus={handleInputFocus}
-          handleSuggestionSelect={handleSuggestionSelect}
           setPickupState={setPickupState}
           setDropoffState={setDropoffState}
         />
@@ -223,5 +189,3 @@ const TripPlan = () => {
 };
 
 export default TripPlan;
-
-

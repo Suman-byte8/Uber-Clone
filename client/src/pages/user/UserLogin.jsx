@@ -1,10 +1,10 @@
-// client/src/pages/user/UserLogin.jsx
-
 import React, { useState } from "react";
 import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
+import { useUserContext } from "../../components/UserContext"; // Import UserContext
 
 const UserLogin = () => {
+    const { setUserId } = useUserContext(); // Access setUserId from context
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -22,7 +22,10 @@ const UserLogin = () => {
             });
 
             setSuccess('Login successful!');
+            const userId = response.data._id; // Get user ID from response
+            setUserId(userId); // Set userId in context
             localStorage.setItem('token', response.data.token);
+            localStorage.setItem('userId', userId); // Store userId in local storage
             navigate('/user-home'); // Redirect to user home page
         } catch (error) {
             console.error('Error logging in:', error);
@@ -72,9 +75,9 @@ const UserLogin = () => {
             </p>
 
             <p className="text-sm text-gray-600 mt-6 pb-3">
-        By proceeding, you agree to Uber's Terms of Service and acknowledge that
-        you have read our Privacy Policy.
-      </p>
+                By proceeding, you agree to Uber's Terms of Service and acknowledge that
+                you have read our Privacy Policy.
+            </p>
         </div>
     );
 };
