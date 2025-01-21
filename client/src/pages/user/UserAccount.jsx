@@ -1,7 +1,11 @@
 import React from "react";
 import Loader from "../../components/Loader";
+import { useUserContext } from "../../components/UserContext";
+import { useNavigate } from "react-router-dom";
 
 const UserAccount = () => {
+  const { userId, logout } = useUserContext();
+  const navigate = useNavigate();
   const [profileData, setProfileData] = React.useState(null);
 
   React.useEffect(() => {
@@ -34,6 +38,11 @@ const UserAccount = () => {
   if (!profileData) {
     return <Loader />;
   }
+
+  const handleLogout = () => {
+    logout();
+    navigate("/user-login");
+  };
 
   return (
     <div className="w-screen h-screen p-4">
@@ -102,6 +111,11 @@ const UserAccount = () => {
         </div>
         <i className="ri-arrow-drop-right-line text-2xl text-gray-500"></i>
       </div>
+
+      <button onClick={handleLogout} className="mt-4 flex items-center text-white bg-red-500 p-2 rounded">
+        <i className="ri-logout-circle-line text-xl mr-2"></i>
+        Logout
+      </button>
     </div>
   );
 };

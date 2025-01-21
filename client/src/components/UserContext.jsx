@@ -27,8 +27,12 @@ export const UserProvider = ({ children }) => {
 
   console.log("UserProvider rendered with userId:", userId); // Debugging line
 
+  const logout = () => {
+    setUserId(null); // Clear userId in context
+  };
+
   return (
-    <UserContext.Provider value={{ userId, setUserId, captainId, setCaptainId }}>
+    <UserContext.Provider value={{ userId, setUserId, captainId, setCaptainId, logout }}>
       {children}
     </UserContext.Provider>
   );
