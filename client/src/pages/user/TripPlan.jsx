@@ -1,15 +1,23 @@
 // TripPlan.jsx
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import gsap from "gsap";
 import axios from "axios";
 import LivePosition from "../../components/LivePosition";
 import PickUpPanel from "../../components/PickUpPanel";
 import { useUserContext } from "../../components/UserContext";
-import { useNavigate } from "react-router-dom";
+
+const debounce = (func, delay) => {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      func(...args);
+    }, delay);
+  };
+};
 
 const TripPlan = () => {
   const { userId } = useUserContext();
-  const navigate = useNavigate();
   const panelRef = useRef(null);
   const contentRef = useRef(null);
   const [panelState, setPanelState] = useState({
@@ -19,10 +27,13 @@ const TripPlan = () => {
     paddingBottom: "3rem",
   });
 
+  const [activeInput, setActiveInput] = useState(null);
+
   const [pickupState, setPickupState] = useState({
     query: "",
     suggestions: [],
     isLoading: false,
+    active: false,
     error: null,
   });
 
@@ -30,15 +41,68 @@ const TripPlan = () => {
     query: "",
     suggestions: [],
     isLoading: false,
+    active: false,
     error: null,
     isVisible: false,
   });
 
   const [location, setLocation] = useState();
 
+  const fetchSuggestions = async (query, setState) => {
+    if (!query.trim()) return;
+    setState((prev) => ({ ...prev, isLoading: true }));
+    try {
+      const response = await axios.get(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${query}`
+      );
+      setState((prev) => ({
+        ...prev,
+        suggestions: response.data,
+        isLoading: false,
+      }));
+    } catch (error) {
+      console.error("Error fetching suggestions:", error);
+      setState((prev) => ({
+        ...prev,
+        isLoading: false,
+        error: error.message,
+      }));
+    }
+  };
+
+  const handleInputFocus = (type) => {
+    setActiveInput(type);
+    if (type === "pickup") {
+      setPickupState((prev) => ({ ...prev, active: true }));
+      setDropoffState((prev) => ({ ...prev, active: false }));
+      if (!panelState.isOpen) {
+        setPanelState((prev) => ({ ...prev, isOpen: true }));
+      }
+    } else if (type === "dropoff") {
+      setPickupState((prev) => ({ ...prev, active: false }));
+      setDropoffState((prev) => ({ ...prev, active: true }));
+    }
+  };
+
+  const handlePickupSearch = useCallback(
+    debounce((query) => {
+      setPickupState((prev) => ({ ...prev, query }));
+      fetchSuggestions(query, setPickupState);
+    }, 300),
+    []
+  );
+
+  const handleDropoffSearch = useCallback(
+    debounce((query) => {
+      setDropoffState((prev) => ({ ...prev, query }));
+      fetchSuggestions(query, setDropoffState);
+    }, 300),
+    []
+  );
+
   const fetchAndUpdateLocation = () => {
     if (!navigator.geolocation) {
-      console.error("Geolocation is not supported by this browser.");
+      console.log("Geolocation is not supported by this browser.");
       return;
     }
 
@@ -49,28 +113,20 @@ const TripPlan = () => {
           lon: position.coords.longitude,
         };
         setLocation(currentLocation);
-
-        if (!userId) {
-          console.error("User ID is not available.");
-          navigate("/user-login");
-          return;
-        }
-
         try {
           const response = await axios.put(
             `${import.meta.env.VITE_BASE_URL}/api/locations/update-location`,
             {
-              lat: currentLocation.lat,
-              lon: currentLocation.lon,
+              lat: location.lat,
+              lon: location.lon,
               userId,
             }
           );
-          console.log("Location updated successfully:", response.data);
+          if (response.status === 200) {
+            console.log("Location updated successfully:", currentLocation);
+          }
         } catch (error) {
-          console.error(
-            "Error updating user location:",
-            error.response?.data || error.message
-          );
+          console.error("Error updating user location:", error);
         }
       },
       (error) => {
@@ -133,12 +189,12 @@ const TripPlan = () => {
     }));
   };
 
-  const handleInputFocus = () => {
-    if (!panelState.isOpen) {
-      setPanelState((prev) => ({
-        ...prev,
-        isOpen: true,
-      }));
+  const handleSuggestionSelect = (suggestion) => {
+    if (activeInput === "pickup") {
+      setPickupState((prev) => ({ ...prev, query: suggestion.display_name, active: false }));
+    } else if (activeInput === "dropoff") {
+      setDropoffState((prev) => ({ ...prev, query: suggestion.display_name, active: false }));
+      setDropoffState((prev) => ({ ...prev, suggestions: [] }));
     }
   };
 
@@ -180,8 +236,10 @@ const TripPlan = () => {
           pickupState={pickupState}
           dropoffState={dropoffState}
           handleInputFocus={handleInputFocus}
-          setPickupState={setPickupState}
-          setDropoffState={setDropoffState}
+          handlePickupSearch={handlePickupSearch}
+          handleDropoffSearch={handleDropoffSearch}
+          handleSuggestionSelect={handleSuggestionSelect}
+          activeInput={activeInput}
         />
       </div>
     </div>

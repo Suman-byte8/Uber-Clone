@@ -14,6 +14,7 @@ import CaptainHome from "./pages/captain/CaptainHome";
 import CaptainLogin from "./pages/captain/CaptainLogin";
 import UserAccount from "./pages/user/UserAccount.jsx";
 import UserLogin from "./pages/user/UserLogin";
+import ChooseRidePanel from "./components/ChooseRidePanel.jsx";
 
 const App = () => {
   return (
@@ -31,6 +32,7 @@ const App = () => {
         <Route path="/user-login" element={<UserLogin />} />
         <Route path="/captain-login" element={<CaptainLogin />} />
         <Route path="/user-account" element={<UserAccount />} />
+        <Route path="/test" element={<ChooseRidePanel/>}/>
       </Routes>
     </UserProvider>
   );
