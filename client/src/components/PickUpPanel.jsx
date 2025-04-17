@@ -104,10 +104,17 @@ const PickUpPanel = ({
           )}
   
           <button
-            className="bg-gray-300 w-full p-3 rounded-xl text-xl font-medium text-gray-800 hover:bg-gray-400 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
+            className={`w-full p-3 rounded-xl text-xl font-medium transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${
+              !pickupState.query || !dropoffState.query
+                ? "bg-gray-500 text-gray-300 cursor-not-allowed"
+                : "bg-gray-300 text-gray-800 hover:bg-gray-400"
+            }`}
             onClick={() => {
-              onConfirmTrip();
+              if (pickupState.query && dropoffState.query) {
+                onConfirmTrip();
+              }
             }}
+            disabled={!pickupState.query || !dropoffState.query}
           >
             Confirm Trip
           </button>

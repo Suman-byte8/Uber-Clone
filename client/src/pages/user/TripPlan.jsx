@@ -14,6 +14,31 @@ const debounce = (func, delay) => {
   };
 };
 
+// Pricing tiers for different vehicle types
+const PRICING_TIERS = {
+  car: {
+    basePrice: 30,
+    pricePerKm: 2,
+    name: "Uber X",
+    icon: "🚗",
+    maxPassengers: 4
+  },
+  auto: {
+    basePrice: 25,
+    pricePerKm: 1.5,
+    name: "Auto",
+    icon: "🛺",
+    maxPassengers: 4
+  },
+  motorcycle: {
+    basePrice: 20,
+    pricePerKm: 1,
+    name: "Motorcycle",
+    icon: "🏍️",
+    maxPassengers: 2
+  }
+};
+
 const TripPlan = () => {
   const { userId } = useUserContext();
   const panelRef = useRef(null);
@@ -31,6 +56,13 @@ const TripPlan = () => {
   const [dropoffState, setDropoffState] = useState({ query: "", suggestions: [], isLoading: false, active: false, error: null, isVisible: false });
   const [location, setLocation] = useState();
   const [showChooseRidePanel, setShowChooseRidePanel] = useState(false);
+  const [distance, setDistance] = useState(null);
+  const [prices, setPrices] = useState({
+    car: null,
+    auto: null,
+    motorcycle: null
+  });
+  const [estimatedTime, setEstimatedTime] = useState(null);
 
   const fetchSuggestions = async (query, setState) => {
     if (!query.trim()) return;
@@ -135,6 +167,81 @@ const TripPlan = () => {
     else if (activeInput === "dropoff") setDropoffState((prev) => ({ ...prev, query: display, active: false, suggestions: [] }));
   };
 
+  const calculateDistanceAndPrices = useCallback(async () => {
+    if (!pickupState.query || !dropoffState.query) {
+      setDistance(null);
+      setPrices({
+        car: null,
+        auto: null,
+        motorcycle: null
+      });
+      setEstimatedTime(null);
+      return;
+    }
+
+    try {
+      // Get coordinates for both locations
+      const pickupResponse = await axios.get(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(pickupState.query)}`
+      );
+      const dropoffResponse = await axios.get(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(dropoffState.query)}`
+      );
+
+      const pickupData = pickupResponse.data;
+      const dropoffData = dropoffResponse.data;
+
+      if (pickupData.length > 0 && dropoffData.length > 0) {
+        const pickup = pickupData[0];
+        const dropoff = dropoffData[0];
+
+        // Calculate distance using Haversine formula
+        const R = 6371; // Earth's radius in km
+        const lat1 = pickup.lat * Math.PI / 180;
+        const lat2 = dropoff.lat * Math.PI / 180;
+        const dLat = (dropoff.lat - pickup.lat) * Math.PI / 180;
+        const dLon = (dropoff.lon - pickup.lon) * Math.PI / 180;
+
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                 Math.cos(lat1) * Math.cos(lat2) *
+                 Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        const distanceInKm = R * c;
+
+        setDistance(distanceInKm);
+
+        // Calculate prices for each vehicle type
+        const calculatedPrices = {};
+        Object.entries(PRICING_TIERS).forEach(([type, tier]) => {
+          const price = Math.round(tier.basePrice + (distanceInKm * tier.pricePerKm));
+          calculatedPrices[type] = price;
+        });
+
+        setPrices(calculatedPrices);
+
+        // Estimate travel time (assuming average speed of 30 km/h in city)
+        const avgSpeedKmh = 30;
+        const timeInHours = distanceInKm / avgSpeedKmh;
+        const timeInMinutes = Math.round(timeInHours * 60);
+        setEstimatedTime(timeInMinutes);
+      }
+    } catch (error) {
+      console.error('Error calculating distance and prices:', error);
+      setDistance(null);
+      setPrices({
+        car: null,
+        auto: null,
+        motorcycle: null
+      });
+      setEstimatedTime(null);
+    }
+  }, [pickupState.query, dropoffState.query]);
+
+  // Calculate distance and prices when locations change
+  useEffect(() => {
+    calculateDistanceAndPrices();
+  }, [calculateDistanceAndPrices]);
+
   const handleConfirmTrip = () => {
     const timeline = gsap.timeline();
     timeline
@@ -202,7 +309,16 @@ const TripPlan = () => {
         </div>
       )}
 
-      {showChooseRidePanel && <ChooseRidePanel onBack={handleBackToPickup} isVisible={showChooseRidePanel} />}
+      {showChooseRidePanel && (
+        <ChooseRidePanel 
+          onBack={handleBackToPickup} 
+          isVisible={showChooseRidePanel} 
+          distance={distance}
+          prices={prices}
+          estimatedTime={estimatedTime}
+          pricingTiers={PRICING_TIERS}
+        />
+      )}
     </div>
   );
 };

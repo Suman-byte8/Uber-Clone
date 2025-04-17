@@ -2,7 +2,14 @@ import React, { useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import gsap from "gsap";
 
-const ChooseRidePanel = ({ onBack, isVisible }) => {
+const ChooseRidePanel = ({ 
+  onBack, 
+  isVisible, 
+  distance, 
+  prices, 
+  estimatedTime,
+  pricingTiers
+}) => {
   const contentRef = useRef(null);
   const panelRef = useRef(null);
 
@@ -29,7 +36,7 @@ const ChooseRidePanel = ({ onBack, isVisible }) => {
         .to(panelRef.current, {
           yPercent: 0,
           opacity: 1,
-          duration: 0.5,
+          duration: 0.8,
           ease: "power3.out",
         })
         .to(
@@ -37,17 +44,17 @@ const ChooseRidePanel = ({ onBack, isVisible }) => {
           {
             y: 0,
             opacity: 1,
-            duration: 0.4,
+            duration: 0.6,
             ease: "power2.out",
           },
-          "-=0.3" // Start content animation before panel finishes
+          "-=0.4" // Start content animation before panel finishes
         );
     } else {
       timeline
         .to(contentRef.current, {
           y: 50,
           opacity: 0,
-          duration: 0.3,
+          duration: 0.5,
           ease: "power2.in",
         })
         .to(
@@ -55,13 +62,32 @@ const ChooseRidePanel = ({ onBack, isVisible }) => {
           {
             yPercent: 100,
             opacity: 0,
-            duration: 0.5,
+            duration: 0.8,
             ease: "power3.in",
           },
-          "-=0.2" // Start panel animation before content finishes
+          "-=0.3" // Start panel animation before content finishes
         );
     }
   }, [isVisible]);
+
+  // Format time for display
+  const formatTime = (minutes) => {
+    if (!minutes) return "";
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hours > 0) {
+      return `${hours}h ${mins}m`;
+    }
+    return `${mins}m`;
+  };
+
+  // Get current time plus estimated travel time
+  const getEstimatedArrivalTime = () => {
+    if (!estimatedTime) return "";
+    const now = new Date();
+    now.setMinutes(now.getMinutes() + estimatedTime);
+    return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
 
   return (
     <div ref={panelRef} className="fixed inset-0 bg-white z-50">
@@ -74,11 +100,23 @@ const ChooseRidePanel = ({ onBack, isVisible }) => {
           Back
         </button>
 
-        <h4 className="w-full text-sm text-center pb-4 border-b-2 border-gray-300">
-          Choose a ride, or swipe up for more
-        </h4>
+        {distance && (
+          <div className="bg-gray-100 p-3 rounded-lg mb-4">
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600">Distance:</span>
+              <span className="font-medium">{distance.toFixed(1)} km</span>
+            </div>
+            {estimatedTime && (
+              <div className="flex justify-between items-center mt-1">
+                <span className="text-gray-600">Est. Time:</span>
+                <span className="font-medium">{formatTime(estimatedTime)}</span>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="_rides w-full px-2">
-          {/* uber cab  */}
+          {/* Car (Uber X) */}
           <div className="_cab flex items-center justify-between border-b-2 py-2">
             <div className="flex items-center justify-between">
               <img
@@ -88,15 +126,16 @@ const ChooseRidePanel = ({ onBack, isVisible }) => {
               />
               <div className="">
                 <h4 className="text-xl font-semibold w-full flex items-center gap-1">
-                  Uber X<i className="ri-user-fill text-sm font-normal"></i>
-                  <span className="text-sm font-normal">4</span>
+                  {pricingTiers.car.name}<i className="ri-user-fill text-sm font-normal"></i>
+                  <span className="text-sm font-normal">{pricingTiers.car.maxPassengers}</span>
                 </h4>
-                <p className="text-sm">3.15pm</p>
+                <p className="text-sm">{getEstimatedArrivalTime()}</p>
               </div>
             </div>
-            <h2 className="text-xl font-medium">₹36.46</h2>
+            <h2 className="text-xl font-medium">₹{prices.car || "---"}</h2>
           </div>
-          {/* uber auto  */}
+          
+          {/* Auto */}
           <div className="_auto flex items-center justify-between border-b-2 py-2">
             <div className="flex items-center justify-between">
               <img
@@ -106,15 +145,16 @@ const ChooseRidePanel = ({ onBack, isVisible }) => {
               />
               <div className="">
                 <h4 className="text-xl font-semibold w-full flex items-center gap-1">
-                  Auto<i className="ri-user-fill text-sm font-normal"></i>
-                  <span className="text-sm font-normal">4</span>
+                  {pricingTiers.auto.name}<i className="ri-user-fill text-sm font-normal"></i>
+                  <span className="text-sm font-normal">{pricingTiers.auto.maxPassengers}</span>
                 </h4>
-                <p className="text-sm">3.15pm</p>
+                <p className="text-sm">{getEstimatedArrivalTime()}</p>
               </div>
             </div>
-            <h2 className="text-xl font-medium">₹34.20</h2>
+            <h2 className="text-xl font-medium">₹{prices.auto || "---"}</h2>
           </div>
-          {/* uber motorcycle  */}
+          
+          {/* Motorcycle */}
           <div className="_moto flex items-center justify-between border-b-2 py-2">
             <div className="flex items-center justify-between">
               <img
@@ -124,18 +164,18 @@ const ChooseRidePanel = ({ onBack, isVisible }) => {
               />
               <div className="">
                 <h4 className="text-xl font-semibold w-full flex items-center gap-1">
-                  Motorcycle<i className="ri-user-fill text-sm font-normal"></i>
-                  <span className="text-sm font-normal">2</span>
+                  {pricingTiers.motorcycle.name}<i className="ri-user-fill text-sm font-normal"></i>
+                  <span className="text-sm font-normal">{pricingTiers.motorcycle.maxPassengers}</span>
                 </h4>
-                <p className="text-sm">3.20pm</p>
+                <p className="text-sm">{getEstimatedArrivalTime()}</p>
               </div>
             </div>
-            <h2 className="text-xl font-medium">₹69.85</h2>
+            <h2 className="text-xl font-medium">₹{prices.motorcycle || "---"}</h2>
           </div>
         </div>
 
         <button className="w-full my-4 bg-black mx-auto p-3 rounded-lg text-white text-xl font-medium">
-          Choose a ride
+          Book a ride
         </button>
       </div>
     </div>
