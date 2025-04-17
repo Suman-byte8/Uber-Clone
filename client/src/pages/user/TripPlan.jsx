@@ -1,19 +1,16 @@
-// TripPlan.jsx
 import React, { useRef, useState, useEffect, useCallback } from "react";
 import gsap from "gsap";
 import axios from "axios";
 import LivePosition from "../../components/LivePosition";
 import PickUpPanel from "../../components/PickUpPanel";
-import { useUserContext } from "../../components/UserContext";
 import ChooseRidePanel from "../../components/ChooseRidePanel";
+import { useUserContext } from "../../components/UserContext";
 
 const debounce = (func, delay) => {
   let timer;
   return (...args) => {
     clearTimeout(timer);
-    timer = setTimeout(() => {
-      func(...args);
-    }, delay);
+    timer = setTimeout(() => func(...args), delay);
   };
 };
 
@@ -21,122 +18,72 @@ const TripPlan = () => {
   const { userId } = useUserContext();
   const panelRef = useRef(null);
   const contentRef = useRef(null);
+
   const [panelState, setPanelState] = useState({
     isOpen: false,
-    height: "160px",
+    height: "90px",
     fullHeight: "100vh",
     paddingBottom: "3rem",
   });
 
   const [activeInput, setActiveInput] = useState(null);
-
-  const [pickupState, setPickupState] = useState({
-    query: "",
-    suggestions: [],
-    isLoading: false,
-    active: true,
-    error: null,
-  });
-
-  const [dropoffState, setDropoffState] = useState({
-    query: "",
-    suggestions: [],
-    isLoading: false,
-    active: false,
-    error: null,
-    isVisible: false,
-  });
-
+  const [pickupState, setPickupState] = useState({ query: "", suggestions: [], isLoading: false, active: true, error: null });
+  const [dropoffState, setDropoffState] = useState({ query: "", suggestions: [], isLoading: false, active: false, error: null, isVisible: false });
   const [location, setLocation] = useState();
-
   const [showChooseRidePanel, setShowChooseRidePanel] = useState(false);
 
   const fetchSuggestions = async (query, setState) => {
     if (!query.trim()) return;
     setState((prev) => ({ ...prev, isLoading: true }));
     try {
-      const response = await axios.get(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${query}`
-      );
-      setState((prev) => ({
-        ...prev,
-        suggestions: response.data,
-        isLoading: false,
-      }));
+      const response = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&q=${query}`);
+      setState((prev) => ({ ...prev, suggestions: response.data, isLoading: false }));
     } catch (error) {
       console.error("Error fetching suggestions:", error);
-      setState((prev) => ({
-        ...prev,
-        isLoading: false,
-        error: error.message,
-      }));
+      setState((prev) => ({ ...prev, isLoading: false, error: error.message }));
     }
   };
 
   const handleInputFocus = (type) => {
     setActiveInput(type);
-    if (type === "pickup") {
-      setPickupState((prev) => ({ ...prev, active: true }));
-      setDropoffState((prev) => ({ ...prev, active: false }));
-      if (!panelState.isOpen) {
-        setPanelState((prev) => ({ ...prev, isOpen: true }));
-      }
-    } else if (type === "dropoff") {
-      setPickupState((prev) => ({ ...prev, active: false }));
-      setDropoffState((prev) => ({ ...prev, active: true }));
-    }
+    setPickupState((prev) => ({ ...prev, active: type === "pickup" }));
+    setDropoffState((prev) => ({ ...prev, active: type === "dropoff" }));
+    if (!panelState.isOpen) setPanelState((prev) => ({ ...prev, isOpen: true }));
   };
 
-  const handlePickupSearch = useCallback(
-    debounce((query) => {
-      setPickupState((prev) => ({ ...prev, query }));
-      fetchSuggestions(query, setPickupState);
-    }, 300),
-    []
-  );
+  const handlePickupSearch = useCallback(debounce((query) => {
+    setPickupState((prev) => ({ ...prev, query }));
+    fetchSuggestions(query, setPickupState);
+  }, 300), []);
 
-  const handleDropoffSearch = useCallback(
-    debounce((query) => {
-      setDropoffState((prev) => ({ ...prev, query }));
-      fetchSuggestions(query, setDropoffState);
-    }, 300),
-    []
-  );
+  const handleDropoffSearch = useCallback(debounce((query) => {
+    setDropoffState((prev) => ({ ...prev, query }));
+    fetchSuggestions(query, setDropoffState);
+  }, 300), []);
 
   const fetchAndUpdateLocation = () => {
-    if (!navigator.geolocation) {
-      console.log("Geolocation is not supported by this browser.");
-      return;
-    }
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const currentLocation = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+      setLocation(currentLocation);
+      try {
+        const res = await axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${currentLocation.lat}&lon=${currentLocation.lon}`);
+        const address = res.data.display_name;
+        setPickupState((prev) => ({ ...prev, query: address }));
+      } catch (e) {
+        console.error("Error getting address:", e);
+      }
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const currentLocation = {
-          lat: position.coords.latitude,
-          lon: position.coords.longitude,
-        };
-        setLocation(currentLocation);
-        try {
-          const response = await axios.put(
-            `${import.meta.env.VITE_BASE_URL}/api/locations/update-location`,
-            {
-              lat: location.lat,
-              lon: location.lon,
-              userId,
-            }
-          );
-          if (response.status === 200) {
-            console.log("Location updated successfully:", currentLocation);
-          }
-        } catch (error) {
-          console.error("Error updating user location:", error);
-        }
-      },
-      (error) => {
-        console.error("Error fetching location:", error);
-      },
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
-    );
+      try {
+        await axios.put(`${import.meta.env.VITE_BASE_URL}/api/locations/update-location`, {
+          lat: currentLocation.lat,
+          lon: currentLocation.lon,
+          userId,
+        });
+      } catch (e) {
+        console.error("Error updating user location:", e);
+      }
+    });
   };
 
   useEffect(() => {
@@ -146,68 +93,75 @@ const TripPlan = () => {
   useEffect(() => {
     if (!panelRef.current || !contentRef.current) return;
 
-    const timeline = gsap.timeline({
-      defaults: { ease: "power2.inOut" },
-    });
+    const timeline = gsap.timeline();
 
     if (panelState.isOpen) {
       timeline
         .to(panelRef.current, {
           height: panelState.fullHeight,
-          duration: 0.3,
+          duration: 0.6,
           ease: "power2.out",
         })
         .to(contentRef.current, {
-          opacity: 1,
+          autoAlpha: 1,
           y: 0,
-          duration: 0.2,
-          delay: -0.1,
-        });
+          duration: 0.5,
+          ease: "power2.out",
+        }, "-=0.3");
     } else {
       timeline
         .to(contentRef.current, {
-          opacity: 0.8,
-          y: 10,
+          autoAlpha: 0,
+          y: 30,
           duration: 0.4,
           ease: "power2.inOut",
         })
         .to(panelRef.current, {
           height: panelState.height,
-          duration: 0.6,
-          ease: "power4.inOut",
+          duration: 0.5,
+          ease: "power3.inOut",
           paddingBottom: panelState.paddingBottom,
-        });
+        }, "-=0.3");
     }
 
-    setDropoffState((prev) => ({
-      ...prev,
-      isVisible: panelState.isOpen,
-    }));
+    setDropoffState((prev) => ({ ...prev, isVisible: panelState.isOpen }));
   }, [panelState.isOpen]);
 
-  const togglePanel = () => {
-    setPanelState((prev) => ({
-      ...prev,
-      isOpen: !prev.isOpen,
-    }));
-  };
+  const togglePanel = () => setPanelState((prev) => ({ ...prev, isOpen: !prev.isOpen }));
 
   const handleSuggestionSelect = (suggestion) => {
-    if (activeInput === "pickup") {
-      setPickupState((prev) => ({ ...prev, query: suggestion.display_name, active: false }));
-    } else if (activeInput === "dropoff") {
-      setDropoffState((prev) => ({ ...prev, query: suggestion.display_name, active: false }));
-      setDropoffState((prev) => ({ ...prev, suggestions: [] }));
-    }
+    const display = suggestion.display_name;
+    if (activeInput === "pickup") setPickupState((prev) => ({ ...prev, query: display, active: false }));
+    else if (activeInput === "dropoff") setDropoffState((prev) => ({ ...prev, query: display, active: false, suggestions: [] }));
   };
 
   const handleConfirmTrip = () => {
-    console.log("Confirm Trip clicked"); // Debug log
-    setPanelState((prev) => ({ ...prev, isOpen: false }));
-    setShowChooseRidePanel(true);
+    const timeline = gsap.timeline();
+    timeline
+      .to(contentRef.current, {
+        autoAlpha: 0,
+        y: 30,
+        duration: 0.5,
+        ease: "power2.inOut",
+      })
+      .to(panelRef.current, {
+        height: panelState.height,
+        duration: 0.6,
+        ease: "power3.inOut",
+        paddingBottom: panelState.paddingBottom,
+        onComplete: () => {
+          setPanelState((prev) => ({ ...prev, isOpen: false }));
+          setShowChooseRidePanel(true);
+        },
+      }, "-=0.3");
   };
 
-  console.log("Show Choose Ride Panel:", showChooseRidePanel); // Debug log
+  const handleBackToPickup = () => {
+    setShowChooseRidePanel(false);
+    setTimeout(() => {
+      setPanelState((prev) => ({ ...prev, isOpen: true }));
+    }, 400);
+  };
 
   return (
     <div className="relative h-screen w-full">
@@ -222,41 +176,33 @@ const TripPlan = () => {
         <LivePosition location={location} />
       </div>
 
-      <div
-        ref={panelRef}
-        className={`w-full p-2 absolute bottom-0 bg-[#252525] rounded-t-xl transition-all duration-700 z-10 ${
-          panelState.isOpen ? "h-full" : "pb-12"
-        }`}
-      >
-        <button
-          onClick={togglePanel}
-          className="w-full h-10 flex items-center justify-center text-white transition-transform duration-200"
+      {!showChooseRidePanel && (
+        <div
+          ref={panelRef}
+          className="w-full p-2 absolute bottom-0 bg-[#252525] rounded-t-xl z-10"
+          style={{ height: panelState.height, paddingBottom: panelState.paddingBottom }}
         >
-          <i
-            className={`ri-arrow-${
-              panelState.isOpen ? "down" : "up"
-            }-wide-line text-2xl transform transition-transform duration-300 ${
-              panelState.isOpen ? "rotate-180" : ""
-            }`}
-          ></i>
-        </button>
+          <button onClick={togglePanel} className="w-full h-10 flex items-center justify-center text-white">
+            <i className={`ri-arrow-${panelState.isOpen ? "down" : "up"}-wide-line text-2xl transition-transform duration-500 ease-in-out ${panelState.isOpen ? "rotate-180" : ""}`} />
+          </button>
 
-        <PickUpPanel
-          contentRef={contentRef}
-          panelState={panelState}
-          pickupState={pickupState}
-          dropoffState={dropoffState}
-          handleInputFocus={handleInputFocus}
-          handlePickupSearch={handlePickupSearch}
-          handleDropoffSearch={handleDropoffSearch}
-          handleSuggestionSelect={handleSuggestionSelect}
-          activeInput={activeInput}
-          onConfirmTrip={handleConfirmTrip}
-          setDropoffState={setDropoffState}
-        />
-      </div>
+          <PickUpPanel
+            contentRef={contentRef}
+            panelState={panelState}
+            pickupState={pickupState}
+            dropoffState={dropoffState}
+            handleInputFocus={handleInputFocus}
+            handlePickupSearch={handlePickupSearch}
+            handleDropoffSearch={handleDropoffSearch}
+            handleSuggestionSelect={handleSuggestionSelect}
+            activeInput={activeInput}
+            onConfirmTrip={handleConfirmTrip}
+            setDropoffState={setDropoffState}
+          />
+        </div>
+      )}
 
-      {showChooseRidePanel && <ChooseRidePanel />}
+      {showChooseRidePanel && <ChooseRidePanel onBack={handleBackToPickup} isVisible={showChooseRidePanel} />}
     </div>
   );
 };

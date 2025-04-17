@@ -2,6 +2,7 @@ import React from "react";
 import Loader from "../../components/Loader";
 import { useUserContext } from "../../components/UserContext";
 import { useNavigate } from "react-router-dom";
+import { FaAngleLeft } from "react-icons/fa6";
 
 const UserAccount = () => {
   const { userId, logout } = useUserContext();
@@ -46,7 +47,14 @@ const UserAccount = () => {
 
   return (
     <div className="w-screen h-screen p-4">
-      <h2 className="text-xl font-semibold">Uber Account</h2>
+      <button 
+        onClick={() => navigate(-1)} 
+        className="flex items-center text-gray-600 mb-4 hover:text-gray-800 gap-3"
+      >
+        <FaAngleLeft />
+      <h2 className="text-xl font-semibold">Go Back</h2>
+      </button>
+
 
       <h1 className="text-3xl font-bold py-5">Account Info</h1>
 
