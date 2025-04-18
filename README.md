@@ -14,6 +14,7 @@ This is the backend system of an online cab booking system. It features user/cap
 - [Project Structure](#project-structure)
 - [How It Works](#how-it-works)
 - [License](#license)
+- [Recent Updates](#recent-updates)
 
 ## Features
 - User Authentication (signup, login, profile management)
@@ -609,3 +610,119 @@ socket.on('connect', () => {
 ## License
 
 This project is licensed under the MIT License. See the LICENSE file for details.
+
+## Recent Updates
+
+### 1. Price Calculation Enhancement
+- Added time-based pricing along with distance-based calculation
+- Implemented more realistic city speed calculations
+- Added per-minute pricing tiers
+```javascript
+const PRICING_TIERS = {
+  car: {
+    basePrice: 30,
+    pricePerKm: 2,
+    pricePerMin: 1, // NEW: Time-based pricing
+    name: "Uber X",
+    maxPassengers: 4
+  }
+  // ... other vehicle types
+};
+```
+
+### 2. Ride Selection Implementation
+- Added selectable ride options with visual feedback
+- Implemented booking state management
+```javascript
+const [selectedRide, setSelectedRide] = useState(null);
+const [bookingState, setBookingState] = useState('INITIAL'); // INITIAL, SEARCHING, DRIVER_FOUND
+```
+
+### 3. Real-time Driver Matching
+- Integrated Socket.IO for real-time communication
+- Added driver matching system
+- Implemented driver location updates
+```javascript
+// Socket event handling
+socket.emit('new_ride_request', {
+  rideType: selectedRide,
+  pickup: pickupLocation,
+  dropoff: dropoffLocation,
+  price: prices[selectedRide],
+  estimatedTime
+});
+
+socket.on('driver_found', (driver) => {
+  setDriverDetails(driver);
+  setBookingState('DRIVER_FOUND');
+});
+```
+
+### 4. Driver Details Panel
+- Added comprehensive driver information display
+- Implemented communication options (call/message)
+- Added ride cancellation functionality
+```jsx
+const DriverDetailsPanel = ({ driver }) => (
+  <div className="fixed inset-0 bg-white z-50 p-4">
+    <div className="flex items-center gap-4">
+      <img src={driver.photo} className="w-16 h-16 rounded-full" />
+      <div>
+        <h3 className="text-xl font-semibold">{driver.name}</h3>
+        <div className="flex items-center gap-1">
+          <i className="ri-star-fill text-yellow-400"></i>
+          <span>{driver.rating}</span>
+        </div>
+      </div>
+    </div>
+    // ... vehicle details and action buttons
+  </div>
+);
+```
+
+### 5. Loading States and UI Improvements
+- Added loading states for price calculation
+- Improved UI feedback during driver search
+- Enhanced ride selection visual feedback
+```jsx
+{bookingState === 'INITIAL' && 'Book a ride'}
+{bookingState === 'SEARCHING' && 'Finding your driver...'}
+{bookingState === 'DRIVER_FOUND' && 'Driver is on the way'}
+```
+
+### 6. Dependencies Added
+- Socket.IO Client for real-time communication
+```bash
+npm install socket.io-client
+```
+
+### 7. Example Response Format for Driver Match
+```javascript
+// Example driver details received from server
+{
+  name: "John Doe",
+  photo: "driver-photo-url.jpg",
+  rating: 4.8,
+  vehicle: {
+    model: "Toyota Camry",
+    color: "Silver",
+    number: "KA 01 AB 1234"
+  },
+  currentLocation: {
+    lat: 12.9716,
+    lon: 77.5946
+  }
+}
+```
+
+### Next Steps
+- Implement chat functionality between driver and rider
+- Add ride sharing options
+- Implement payment integration
+- Add ride history tracking
+- Enhance real-time location tracking accuracy
+
+### Known Issues
+- Socket connection needs error handling improvement
+- Location updates might be delayed in certain conditions
+- Need to implement timeout for driver search

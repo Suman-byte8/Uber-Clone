@@ -8,32 +8,64 @@ const UserAccount = () => {
   const { userId, logout } = useUserContext();
   const navigate = useNavigate();
   const [profileData, setProfileData] = React.useState(null);
+  const [error, setError] = React.useState(null);
 
   React.useEffect(() => {
     const fetchData = async () => {
       try {
+        const token = localStorage.getItem("token");
+        
+        if (!token) {
+          throw new Error("No authentication token found");
+        }
+
         const response = await fetch(
           `${import.meta.env.VITE_BASE_URL}/api/user/account`,
           {
             method: "GET",
             headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
+              "Authorization": `Bearer ${token}`,
+              "Content-Type": "application/json"
             },
           }
         );
 
         if (!response.ok) {
-          throw new Error("Network response was not ok");
+          if (response.status === 401) {
+            // Token is invalid or expired
+            logout();
+            navigate("/user-login");
+            throw new Error("Session expired. Please login again.");
+          }
+          throw new Error("Failed to fetch account data");
         }
+
         const data = await response.json();
         setProfileData(data);
       } catch (error) {
         console.error("There was a problem with the fetch operation:", error);
+        setError(error.message);
       }
     };
 
     fetchData();
-  }, []);
+  }, [logout, navigate]);
+
+  if (error) {
+    return (
+      <div className="w-screen h-screen p-4">
+        <div className="text-center mt-8">
+          <p className="text-red-500 mb-4">{error}</p>
+          <button 
+            onClick={() => navigate("/user-login")}
+            className="bg-blue-500 text-white px-4 py-2 rounded"
+          >
+            Return to Login
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Add a loading state until profileData is available
   if (!profileData) {
@@ -52,9 +84,8 @@ const UserAccount = () => {
         className="flex items-center text-gray-600 mb-4 hover:text-gray-800 gap-3"
       >
         <FaAngleLeft />
-      <h2 className="text-xl font-semibold">Go Back</h2>
+        <h2 className="text-xl font-semibold">Go Back</h2>
       </button>
-
 
       <h1 className="text-3xl font-bold py-5">Account Info</h1>
 

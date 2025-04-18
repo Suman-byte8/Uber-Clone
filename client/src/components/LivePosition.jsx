@@ -18,8 +18,14 @@ const customIcon = new L.Icon({
   popupAnchor: [1, -34],
 });
 
-const LivePosition = ({ location }) => {
+const LivePosition = ({ location, onMapReady }) => {
   const [map, setMap] = useState(null);
+
+  useEffect(() => {
+    if (map) {
+      onMapReady(map);
+    }
+  }, [map, onMapReady]);
 
   // Debugging location and map state
   useEffect(() => {
@@ -44,8 +50,8 @@ const LivePosition = ({ location }) => {
         <MapContainer
           center={initialCenter}
           zoom={15}
-          style={{ height: "100vh", width: "100%",zIndex:"1" }}
-          whenCreated={setMap} // Capture map instance when created
+          style={{ height: "100vh", width: "100%", zIndex: "1" }}
+          whenCreated={setMap}
           scrollWheelZoom={true}
         >
           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
@@ -60,12 +66,12 @@ const LivePosition = ({ location }) => {
         <div className="text-center mt-4">Loading map...</div>
       )}
 
-      <button
+      {/* <button
         onClick={relocateToCurrentLocation}
         className="fixed bottom-4 right-4 bg-blue-500 text-white p-2 rounded-full shadow-lg"
       >
         Recenter
-      </button>
+      </button> */}
     </div>
   );
 };
