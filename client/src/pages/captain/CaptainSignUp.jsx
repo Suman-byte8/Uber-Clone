@@ -229,7 +229,7 @@ const CaptainSignUp = () => {
             required
           />
         </div>
-        {error && <p className="text-red-500">{error}</p>} Display error message
+        {error && <p className="text-red-500">{error}</p>} {/* Display error message */}
         {/* {success && <p className="text-green-500">{success}</p>} Display success message */}
         <button
           type="submit"

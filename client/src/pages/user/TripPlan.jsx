@@ -19,6 +19,7 @@ const PRICING_TIERS = {
   car: {
     basePrice: 30,
     pricePerKm: 2,
+    pricePerMin: 1,
     name: "Uber X",
     icon: "🚗",
     maxPassengers: 4
@@ -26,6 +27,7 @@ const PRICING_TIERS = {
   auto: {
     basePrice: 25,
     pricePerKm: 1.5,
+    pricePerMin: 0.8,
     name: "Auto",
     icon: "🛺",
     maxPassengers: 4
@@ -33,6 +35,7 @@ const PRICING_TIERS = {
   motorcycle: {
     basePrice: 20,
     pricePerKm: 1,
+    pricePerMin: 0.5,
     name: "Motorcycle",
     icon: "🏍️",
     maxPassengers: 2
@@ -64,6 +67,7 @@ const TripPlan = () => {
   });
   const [estimatedTime, setEstimatedTime] = useState(null);
 
+  // function to fetch suggestions 
   const fetchSuggestions = async (query, setState) => {
     if (!query.trim()) return;
     setState((prev) => ({ ...prev, isLoading: true }));
@@ -76,6 +80,7 @@ const TripPlan = () => {
     }
   };
 
+  // function to handle input focus
   const handleInputFocus = (type) => {
     setActiveInput(type);
     setPickupState((prev) => ({ ...prev, active: type === "pickup" }));
@@ -93,6 +98,8 @@ const TripPlan = () => {
     fetchSuggestions(query, setDropoffState);
   }, 300), []);
 
+  // function to fetch and update user location
+  // and address using OpenStreetMap Nominatim API
   const fetchAndUpdateLocation = () => {
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(async (pos) => {
@@ -161,12 +168,15 @@ const TripPlan = () => {
 
   const togglePanel = () => setPanelState((prev) => ({ ...prev, isOpen: !prev.isOpen }));
 
+  // function to handle suggestion selection
   const handleSuggestionSelect = (suggestion) => {
     const display = suggestion.display_name;
     if (activeInput === "pickup") setPickupState((prev) => ({ ...prev, query: display, active: false }));
     else if (activeInput === "dropoff") setDropoffState((prev) => ({ ...prev, query: display, active: false, suggestions: [] }));
   };
 
+
+  // function to calculate distance and prices
   const calculateDistanceAndPrices = useCallback(async () => {
     if (!pickupState.query || !dropoffState.query) {
       setDistance(null);
@@ -210,20 +220,23 @@ const TripPlan = () => {
 
         setDistance(distanceInKm);
 
-        // Calculate prices for each vehicle type
+        // Calculate prices for each vehicle type with time and distance
+        const avgSpeedKmh = 25; // More realistic city speed
+        const timeInHours = distanceInKm / avgSpeedKmh;
+        const timeInMinutes = Math.round(timeInHours * 60);
+        setEstimatedTime(timeInMinutes);
+
         const calculatedPrices = {};
         Object.entries(PRICING_TIERS).forEach(([type, tier]) => {
-          const price = Math.round(tier.basePrice + (distanceInKm * tier.pricePerKm));
+          const price = Math.round(
+            tier.basePrice +
+            (distanceInKm * tier.pricePerKm) +
+            (timeInMinutes * tier.pricePerMin)
+          );
           calculatedPrices[type] = price;
         });
 
         setPrices(calculatedPrices);
-
-        // Estimate travel time (assuming average speed of 30 km/h in city)
-        const avgSpeedKmh = 30;
-        const timeInHours = distanceInKm / avgSpeedKmh;
-        const timeInMinutes = Math.round(timeInHours * 60);
-        setEstimatedTime(timeInMinutes);
       }
     } catch (error) {
       console.error('Error calculating distance and prices:', error);
