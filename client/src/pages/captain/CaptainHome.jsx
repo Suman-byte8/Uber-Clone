@@ -6,6 +6,7 @@ import { FaArrowTrendUp } from 'react-icons/fa6'
 import { CiCompass1 } from "react-icons/ci";
 import LivePosition from "../../components/LivePosition";
 import pfp from "../../../public/3464ad1c33c983b87d66f14b092f11ee.jpg";
+import { Link } from "react-router-dom";
 
 const CaptainHome = () => {
   const [isDriverOnline, setIsDriverOnline] = useState(false);
@@ -69,13 +70,13 @@ const CaptainHome = () => {
   return (
     <div className="w-full max-h-screen bg-gray-100">
       <nav className="fixed top-0 w-full p-3 py-2 flex items-center justify-between z-10 bg-white shadow-md">
-        <div className="_profilePicture mb-4">
+        <Link to="profile" className="_profilePicture mb-4">
           <img
             src={pfp}
             alt="Profile"
             className="w-12 h-12 rounded-full bg-gray-200"
           />
-        </div>
+        </Link>
 
         <Switcher12 />
 
