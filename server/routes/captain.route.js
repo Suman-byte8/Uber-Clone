@@ -1,7 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
-const { registerCaptain,loginCaptain } = require('../controllers/captain.controller');
+const { 
+  registerCaptain, 
+  loginCaptain, 
+  getCaptainDetails, 
+  updateCaptainDetails, 
+  toggleOnlineStatus 
+} = require('../controllers/captain.controller');
+const { protect, authorize } = require('../middleware/auth');
 
 // Captain signup route with validation
 router.post('/signup', [
@@ -23,11 +30,27 @@ router.post('/signup', [
     body('vehicle.licensePlate').notEmpty().withMessage('License plate number is required')
 ], registerCaptain);
 
+// Captain login route with validation
 router.post('/login', [
     body('email').isEmail().withMessage('Must be a valid email address'),
     body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters long')
 ], loginCaptain);
 
+// Get captain details route
+router.get('/:captainId', protect, authorize('captain'), getCaptainDetails);
 
+// Update captain profile route with validation
+router.put('/:captainId', [
+    protect,
+    authorize('captain'),
+    body('name').optional().isLength({ min: 3 }).withMessage('Name must be at least 3 characters long'),
+    body('vehicleDetails.model').optional().notEmpty().withMessage('Vehicle model cannot be empty'),
+    body('vehicleDetails.color').optional().notEmpty().withMessage('Vehicle color cannot be empty'),
+    body('vehicleDetails.number').optional().notEmpty().withMessage('Vehicle number cannot be empty'),
+    body('vehicleDetails.type').optional().notEmpty().withMessage('Vehicle type cannot be empty')
+], updateCaptainDetails);
+
+// Toggle online status route
+router.put('/:captainId/toggle-status', protect, authorize('captain'), toggleOnlineStatus);
 
 module.exports = router;

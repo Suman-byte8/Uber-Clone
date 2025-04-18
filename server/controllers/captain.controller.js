@@ -1,4 +1,5 @@
 const Captain = require('../models/captain.model');
+const Trip = require('../models/Trip');
 const { validationResult } = require('express-validator');
 const { hashPassword } = require('../services/hashPassword');
 const { generateToken } = require('../services/JWToken'); // Updated import for JWT token generation
@@ -119,6 +120,166 @@ const loginCaptain = async (req, res) => {
     }
 };
 
+// Get captain details
+const getCaptainDetails = async (req, res) => {
+  try {
+    const captainId = req.params.captainId;
 
+    // Find captain by ID and exclude sensitive information
+    const captain = await Captain.findById(captainId)
+      .select('-password -refreshToken -__v')
+      .lean();
 
-module.exports = { registerCaptain,loginCaptain };
+    if (!captain) {
+      return res.status(404).json({
+        success: false,
+        message: 'Captain not found'
+      });
+    }
+
+    // Calculate additional statistics
+    const stats = await calculateCaptainStats(captainId);
+    
+    // Combine captain details with statistics
+    const captainDetails = {
+      ...captain,
+      ...stats
+    };
+
+    res.status(200).json({
+      success: true,
+      data: captainDetails
+    });
+  } catch (error) {
+    console.error('Error in getCaptainDetails:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+// Helper function to calculate captain statistics
+const calculateCaptainStats = async (captainId) => {
+  try {
+    // Get completed trips
+    const completedTrips = await Trip.find({
+      captain: captainId,
+      status: 'completed'
+    });
+
+    // Calculate total trips
+    const totalTrips = completedTrips.length;
+
+    // Calculate total earnings
+    const totalEarnings = completedTrips.reduce((sum, trip) => sum + trip.fare, 0);
+
+    // Calculate average rating
+    const ratings = completedTrips.map(trip => trip.rating).filter(rating => rating);
+    const averageRating = ratings.length > 0
+      ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length
+      : 0;
+
+    return {
+      totalTrips,
+      totalEarnings,
+      rating: averageRating
+    };
+  } catch (error) {
+    console.error('Error calculating captain stats:', error);
+    return {
+      totalTrips: 0,
+      totalEarnings: 0,
+      rating: 0
+    };
+  }
+};
+
+// Update captain details
+const updateCaptainDetails = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array()
+      });
+    }
+
+    const captainId = req.params.captainId;
+    const updates = req.body;
+
+    // Remove sensitive fields from updates
+    delete updates.password;
+    delete updates.email;
+    delete updates.phone;
+    delete updates.refreshToken;
+
+    const captain = await Captain.findByIdAndUpdate(
+      captainId,
+      { $set: updates },
+      { new: true, runValidators: true }
+    ).select('-password -refreshToken -__v');
+
+    if (!captain) {
+      return res.status(404).json({
+        success: false,
+        message: 'Captain not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: captain
+    });
+  } catch (error) {
+    console.error('Error in updateCaptainDetails:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+// Toggle captain online status
+const toggleOnlineStatus = async (req, res) => {
+  try {
+    const captainId = req.params.captainId;
+    
+    const captain = await Captain.findById(captainId);
+    if (!captain) {
+      return res.status(404).json({
+        success: false,
+        message: 'Captain not found'
+      });
+    }
+
+    // Toggle the online status
+    captain.isOnline = !captain.isOnline;
+    await captain.save();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        isOnline: captain.isOnline
+      }
+    });
+  } catch (error) {
+    console.error('Error in toggleOnlineStatus:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+module.exports = {
+  registerCaptain,
+  loginCaptain,
+  getCaptainDetails,
+  updateCaptainDetails,
+  toggleOnlineStatus
+};
