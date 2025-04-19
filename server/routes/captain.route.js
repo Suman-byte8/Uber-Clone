@@ -39,18 +39,20 @@ router.post('/login', [
 // Get captain details route
 router.get('/:captainId', protect, authorize('captain'), getCaptainDetails);
 
-// Update captain profile route with validation
+// Update captain details route with validation
 router.put('/:captainId', [
-    protect,
+    protect, 
     authorize('captain'),
     body('name').optional().isLength({ min: 3 }).withMessage('Name must be at least 3 characters long'),
-    body('vehicleDetails.model').optional().notEmpty().withMessage('Vehicle model cannot be empty'),
-    body('vehicleDetails.color').optional().notEmpty().withMessage('Vehicle color cannot be empty'),
-    body('vehicleDetails.number').optional().notEmpty().withMessage('Vehicle number cannot be empty'),
-    body('vehicleDetails.type').optional().notEmpty().withMessage('Vehicle type cannot be empty')
+    body('vehicle.make').optional().notEmpty().withMessage('Vehicle make cannot be empty'),
+    body('vehicle.model').optional().notEmpty().withMessage('Vehicle model cannot be empty'),
+    body('vehicle.year').optional().isNumeric().withMessage('Vehicle year must be a number'),
+    body('vehicle.color').optional().notEmpty().withMessage('Vehicle color cannot be empty'),
+    body('vehicle.licensePlate').optional().notEmpty().withMessage('License plate cannot be empty'),
+    body('drivingLicense.expiryDate').optional().isISO8601().withMessage('Valid license expiry date is required')
 ], updateCaptainDetails);
 
-// Toggle online status route
+// Toggle captain active status
 router.put('/:captainId/toggle-status', protect, authorize('captain'), toggleOnlineStatus);
 
 module.exports = router;

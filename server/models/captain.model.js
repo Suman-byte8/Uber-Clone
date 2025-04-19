@@ -15,9 +15,11 @@ const captainSchema = new Schema({
         lowercase: true,
         match: [/.+@.+\..+/, 'Please enter a valid email address']
     },
-    role:{
-        type:String,
-        default:"captain"
+    role: {
+        type: String,
+        default: "captain",
+        immutable: true,  // Prevents the role from being changed after creation
+        enum: ["captain"] // Ensures the role can only be "captain"
     },
     phoneNumber: {
         type: String,

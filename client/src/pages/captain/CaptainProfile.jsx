@@ -1,23 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { useUserContext } from '../../components/UserContext';
+import { useParams } from 'react-router-dom'; // <-- Import useParams
 import axios from 'axios';
 
 const CaptainProfile = () => {
-  const { captainId, logout } = useUserContext();
+  const { captainId: contextCaptainId, logout } = useUserContext();
+  const { captainId: paramsCaptainId } = useParams(); // <-- Get from params if available
+
+  // Prefer context, fallback to params
+  const captainId = contextCaptainId || paramsCaptainId;
+
   const [profile, setProfile] = useState({
     name: '',
     email: '',
-    phone: '',
-    vehicleDetails: {
+    phoneNumber: '',
+    vehicle: {
+      make: '',
       model: '',
+      year: '',
       color: '',
+      licensePlate: ''
+    },
+    drivingLicense: {
       number: '',
-      type: ''
+      expiryDate: ''
     },
     rating: 0,
-    totalTrips: 0,
-    earnings: 0,
-    isOnline: false
+    isActive: false
   });
   const [isEditing, setIsEditing] = useState(false);
   const [editedProfile, setEditedProfile] = useState({});
@@ -25,9 +34,14 @@ const CaptainProfile = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const response = await axios.get(`${import.meta.env.VITE_BASE_URL}/api/captains/${captainId}`);
-        setProfile(response.data);
-        setEditedProfile(response.data);
+        const token = localStorage.getItem('token');
+        const response = await axios.get(`${import.meta.env.VITE_BASE_URL}/api/captain/${captainId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        setProfile(response.data.data);
+        setEditedProfile(response.data.data);
       } catch (error) {
         console.error('Error fetching profile:', error);
       }
@@ -37,6 +51,8 @@ const CaptainProfile = () => {
       fetchProfile();
     }
   }, [captainId]);
+
+
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -57,10 +73,20 @@ const CaptainProfile = () => {
     }
   };
 
+  // Remove these duplicate functions:
+  // const handleSubmit = async (e) => { ... }
+  // const toggleOnlineStatus = async () => { ... }
+  
+  // Keep only these (with token in headers):
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.put(`${import.meta.env.VITE_BASE_URL}/api/captains/${captainId}`, editedProfile);
+      const token = localStorage.getItem('token');
+      await axios.put(`${import.meta.env.VITE_BASE_URL}/api/captain/${captainId}`, editedProfile, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
       setProfile(editedProfile);
       setIsEditing(false);
     } catch (error) {
@@ -70,8 +96,13 @@ const CaptainProfile = () => {
 
   const toggleOnlineStatus = async () => {
     try {
-      const response = await axios.put(`${import.meta.env.VITE_BASE_URL}/api/captains/${captainId}/toggle-status`);
-      setProfile(prev => ({ ...prev, isOnline: response.data.isOnline }));
+      const token = localStorage.getItem('token');
+      const response = await axios.put(`${import.meta.env.VITE_BASE_URL}/api/captain/${captainId}/toggle-status`, {}, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      setProfile(prev => ({ ...prev, isActive: response.data.data.isActive }));
     } catch (error) {
       console.error('Error toggling status:', error);
     }
@@ -168,7 +199,7 @@ const CaptainProfile = () => {
                     <input
                       type="tel"
                       name="phone"
-                      value={isEditing ? editedProfile.phone : profile.phone}
+                      value={isEditing ? editedProfile.phoneNumber : profile.phoneNumber}
                       onChange={handleInputChange}
                       disabled={!isEditing}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
@@ -181,44 +212,55 @@ const CaptainProfile = () => {
                 <h3 className="text-lg font-medium text-gray-900 mb-4">Vehicle Information</h3>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Vehicle Model</label>
+                    <label className="block text-sm font-medium text-gray-700">Make</label>
                     <input
                       type="text"
-                      name="vehicleDetails.model"
-                      value={isEditing ? editedProfile.vehicleDetails?.model : profile.vehicleDetails?.model}
+                      name="vehicle.make"
+                      value={isEditing ? editedProfile.vehicle?.make : profile.vehicle?.make}
                       onChange={handleInputChange}
                       disabled={!isEditing}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Vehicle Color</label>
+                    <label className="block text-sm font-medium text-gray-700">Model</label>
                     <input
                       type="text"
-                      name="vehicleDetails.color"
-                      value={isEditing ? editedProfile.vehicleDetails?.color : profile.vehicleDetails?.color}
+                      name="vehicle.model"
+                      value={isEditing ? editedProfile.vehicle?.model : profile.vehicle?.model}
                       onChange={handleInputChange}
                       disabled={!isEditing}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Vehicle Number</label>
+                    <label className="block text-sm font-medium text-gray-700">Year</label>
                     <input
-                      type="text"
-                      name="vehicleDetails.number"
-                      value={isEditing ? editedProfile.vehicleDetails?.number : profile.vehicleDetails?.number}
+                      type="number"
+                      name="vehicle.year"
+                      value={isEditing ? editedProfile.vehicle?.year : profile.vehicle?.year}
                       onChange={handleInputChange}
                       disabled={!isEditing}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Vehicle Type</label>
+                    <label className="block text-sm font-medium text-gray-700">Color</label>
                     <input
                       type="text"
-                      name="vehicleDetails.type"
-                      value={isEditing ? editedProfile.vehicleDetails?.type : profile.vehicleDetails?.type}
+                      name="vehicle.color"
+                      value={isEditing ? editedProfile.vehicle?.color : profile.vehicle?.color}
+                      onChange={handleInputChange}
+                      disabled={!isEditing}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">License Plate</label>
+                    <input
+                      type="text"
+                      name="vehicle.licensePlate"
+                      value={isEditing ? editedProfile.vehicle?.licensePlate : profile.vehicle?.licensePlate}
                       onChange={handleInputChange}
                       disabled={!isEditing}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
@@ -265,4 +307,4 @@ const CaptainProfile = () => {
   );
 };
 
-export default CaptainProfile; 
+export default CaptainProfile;

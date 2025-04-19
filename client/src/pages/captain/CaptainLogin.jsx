@@ -25,8 +25,9 @@ const CaptainLogin = () => {
       );
 
       setSuccess("Login successful!");
-      const captainId = response.data._id;
+      const captainId = response.data.captain._id;
       login(response.data.token, captainId, 'captain'); // Use the login function instead
+      console.log(captainId); // Add this line to log the captainId (for debugging purrr)
       navigate("/captain-home");
     } catch (error) {
       console.error("Error logging in:", error);

@@ -90,15 +90,14 @@ const loginCaptain = async (req, res) => {
             return res.status(401).json({ message: 'Invalid email or password' });
         }
 
-        // Compare provided password with hashed password
         const isValidPassword = await comparePassword(password, captain.password);
 
         if (!isValidPassword) {
             return res.status(401).json({ message: 'Invalid email or password' });
         }
 
-        // Generate JWT token
-        const token = generateToken(captain._id, captain.role);
+        // Generate JWT token with both id and role
+        const token = generateToken(captain._id, captain.role); // Use captain.role from the model
 
         res.status(200).json({
             message: 'Captain logged in successfully',
@@ -107,7 +106,7 @@ const loginCaptain = async (req, res) => {
                 name: captain.name,
                 email: captain.email,
                 phoneNumber: captain.phoneNumber,
-                role: captain.role,
+                role: captain.role, // Use captain.role from the model
             },
             token
         });
@@ -126,7 +125,7 @@ const getCaptainDetails = async (req, res) => {
 
     // Find captain by ID and exclude sensitive information
     const captain = await Captain.findById(captainId)
-      .select('-password -refreshToken -__v')
+      .select('-password -__v')
       .lean();
 
     if (!captain) {
@@ -136,18 +135,10 @@ const getCaptainDetails = async (req, res) => {
       });
     }
 
-    // Calculate additional statistics
-    const stats = await calculateCaptainStats(captainId);
-    
-    // Combine captain details with statistics
-    const captainDetails = {
-      ...captain,
-      ...stats
-    };
-
+    // Return captain details without stats for now
     res.status(200).json({
       success: true,
-      data: captainDetails
+      data: captain
     });
   } catch (error) {
     console.error('Error in getCaptainDetails:', error);
@@ -242,7 +233,7 @@ const updateCaptainDetails = async (req, res) => {
   }
 };
 
-// Toggle captain online status
+// Toggle captain active status
 const toggleOnlineStatus = async (req, res) => {
   try {
     const captainId = req.params.captainId;
@@ -255,14 +246,14 @@ const toggleOnlineStatus = async (req, res) => {
       });
     }
 
-    // Toggle the online status
-    captain.isOnline = !captain.isOnline;
+    // Toggle the active status
+    captain.isActive = !captain.isActive;
     await captain.save();
 
     res.status(200).json({
       success: true,
       data: {
-        isOnline: captain.isOnline
+        isActive: captain.isActive
       }
     });
   } catch (error) {
