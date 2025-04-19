@@ -1,15 +1,19 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
-import App from './App';
+import { BrowserRouter } from 'react-router-dom'; // Import BrowserRouter
+import App from './App.jsx';
 import './index.css';
-import 'leaflet/dist/leaflet.css';
+import { UserProvider } from './context/UserContext.jsx'; // Corrected path
+import { ToastProvider } from './context/ToastContext.jsx';
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(
+ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <App />
+    <BrowserRouter> {/* Wrap everything inside BrowserRouter */}
+      <UserProvider>
+        <ToastProvider>
+          <App />
+        </ToastProvider>
+      </UserProvider>
     </BrowserRouter>
-  </React.StrictMode>
+  </React.StrictMode>,
 );

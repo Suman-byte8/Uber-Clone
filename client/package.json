@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host",
     "build": "vite build",
-    "lint": "eslint .",
+    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -21,6 +21,7 @@
     "react-leaflet-draw": "^0.20.4",
     "react-map-gl": "^7.1.8",
     "react-router-dom": "^7.1.1",
+    "react-toastify": "^11.0.5",
     "remixicon": "^4.6.0",
     "socket.io-client": "^4.8.1"
   },

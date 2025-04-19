@@ -4,7 +4,7 @@ import axios from "axios";
 import LivePosition from "../../components/LivePosition";
 import PickUpPanel from "../../components/PickUpPanel";
 import ChooseRidePanel from "../../components/ChooseRidePanel";
-import { useUserContext } from "../../components/UserContext";
+import { useUserContext } from "../../context/UserContext";
 
 const debounce = (func, delay) => {
   let timer;

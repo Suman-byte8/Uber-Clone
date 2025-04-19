@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
-import { useUserContext } from "../../components/UserContext"; // Import UserContext
+import { useUserContext } from "../../context/UserContext"; // Import UserContext
  // Import UserContext
 
 const UserSignUp = () => {

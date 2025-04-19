@@ -70,7 +70,7 @@ const CaptainHome = () => {
   return (
     <div className="w-full max-h-screen bg-gray-100">
       <nav className="fixed top-0 w-full p-3 py-2 flex items-center justify-between z-10 bg-white shadow-md">
-        <Link to="profile" className="_profilePicture mb-4">
+        <Link to="profile" className="_profilePicture flex items-center justify-center">
           <img
             src={pfp}
             alt="Profile"

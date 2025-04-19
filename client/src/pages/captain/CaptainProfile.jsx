@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { useUserContext } from '../../components/UserContext';
-import { useParams } from 'react-router-dom'; // <-- Import useParams
+import { useUserContext } from '../../context/UserContext';
+import { useParams, useNavigate } from 'react-router-dom'; // Import useNavigate
 import axios from 'axios';
+import { useToast } from '../../context/ToastContext';
+import { FiEdit, FiLogOut, FiUser, FiTruck, FiCheckCircle, FiXCircle, FiArrowLeft } from 'react-icons/fi'; // Import FiArrowLeft
 
 const CaptainProfile = () => {
-  const { captainId: contextCaptainId, logout } = useUserContext();
-  const { captainId: paramsCaptainId } = useParams(); // <-- Get from params if available
-
-  // Prefer context, fallback to params
+  const { captainId: contextCaptainId, logout: contextLogout } = useUserContext();
+  const { captainId: paramsCaptainId } = useParams();
+  const { showToast } = useToast();
   const captainId = contextCaptainId || paramsCaptainId;
 
   const [profile, setProfile] = useState({
@@ -26,7 +27,9 @@ const CaptainProfile = () => {
       expiryDate: ''
     },
     rating: 0,
-    isActive: false
+    isActive: false,
+    totalTrips: 0, // Add defaults if needed
+    earnings: 0   // Add defaults if needed
   });
   const [isEditing, setIsEditing] = useState(false);
   const [editedProfile, setEditedProfile] = useState({});
@@ -35,22 +38,35 @@ const CaptainProfile = () => {
     const fetchProfile = async () => {
       try {
         const token = localStorage.getItem('token');
+        if (!captainId || !token) {
+            console.error("Captain ID or token missing");
+            showToast('Could not load profile. Please log in again.', 'error');
+            // Optional: redirect to login
+            return;
+        }
         const response = await axios.get(`${import.meta.env.VITE_BASE_URL}/api/captain/${captainId}`, {
           headers: {
             Authorization: `Bearer ${token}`
           }
         });
-        setProfile(response.data.data);
-        setEditedProfile(response.data.data);
+        // Ensure nested objects exist before setting state
+        const fetchedData = response.data.data || {};
+        const initialProfile = {
+            ...profile, // Keep existing defaults
+            ...fetchedData,
+            vehicle: fetchedData.vehicle || profile.vehicle,
+            drivingLicense: fetchedData.drivingLicense || profile.drivingLicense,
+        };
+        setProfile(initialProfile);
+        setEditedProfile(initialProfile);
       } catch (error) {
         console.error('Error fetching profile:', error);
+        showToast('Failed to fetch profile.', 'error');
       }
     };
 
-    if (captainId) {
-      fetchProfile();
-    }
-  }, [captainId]);
+    fetchProfile();
+  }, [captainId]); // Removed profile from dependency array to avoid loop
 
 
 
@@ -73,11 +89,7 @@ const CaptainProfile = () => {
     }
   };
 
-  // Remove these duplicate functions:
-  // const handleSubmit = async (e) => { ... }
-  // const toggleOnlineStatus = async () => { ... }
-  
-  // Keep only these (with token in headers):
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -89,8 +101,10 @@ const CaptainProfile = () => {
       });
       setProfile(editedProfile);
       setIsEditing(false);
+      showToast('Profile updated successfully!', 'success'); // Show success toast
     } catch (error) {
       console.error('Error updating profile:', error);
+      showToast('Failed to update profile.', 'error'); // Show error toast
     }
   };
 
@@ -102,206 +116,282 @@ const CaptainProfile = () => {
           Authorization: `Bearer ${token}`
         }
       });
-      setProfile(prev => ({ ...prev, isActive: response.data.data.isActive }));
+      const newStatus = response.data.data.isActive;
+      setProfile(prev => ({ ...prev, isActive: newStatus }));
+      showToast(`Status updated to ${newStatus ? 'Online' : 'Offline'}`, 'info'); // Show info toast
     } catch (error) {
       console.error('Error toggling status:', error);
+      showToast('Failed to update status.', 'error'); // Show error toast
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gray-100 py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl mx-auto">
-        {/* Header */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900">Driver Profile</h1>
-            <button
-              onClick={logout}
-              className="text-red-600 hover:text-red-800 font-medium"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
+  // Define logout function for this component
+  const handleLogout = () => {
+    contextLogout(); // Call the logout function from context
+    showToast('Logged out successfully.', 'success');
+    // No need to navigate here if UserContext handles it
+  };
 
-        {/* Profile Content */}
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          {/* Online Status Toggle */}
-          <div className="p-6 border-b">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-medium text-gray-900">Online Status</h2>
-                <p className="text-sm text-gray-500">
-                  {profile.isOnline ? 'You are currently online and available for rides' : 'You are currently offline'}
-                </p>
+  const navigate = useNavigate();
+    // Define go back function
+    const handleGoBack = () => {
+      navigate(-1); // Navigate to the previous page in history
+    };
+
+
+  // Add loading state check
+  // Loading and error states
+  if (!captainId) {
+    return <div className="min-h-screen flex items-center justify-center bg-gray-100 text-red-600">Error: Captain ID not found. Please log in.</div>;
+  }
+  if (!profile.email && captainId) { // Check if profile is still loading
+    return <div className="min-h-screen flex items-center justify-center bg-gray-100">Loading profile...</div>;
+  }
+
+  // Helper function to format date (optional, adjust as needed)
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    try {
+      return new Date(dateString).toISOString().split('T')[0];
+    } catch (e) {
+      return dateString; // Return original if parsing fails
+    }
+  };
+
+
+  return (
+    <div className="min-h-screen bg-gray-100">
+      {/* Header Bar */}
+      <div className="bg-white shadow-sm sticky top-0 z-10">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
+          {/* Go Back Button */}
+          <button
+            onClick={handleGoBack}
+            className="flex items-center text-sm text-gray-600 hover:text-gray-800 font-medium transition duration-150 ease-in-out"
+            aria-label="Go back"
+          >
+            <FiArrowLeft className="mr-1 h-4 w-4" />
+            Back
+          </button>
+
+          <h1 className="text-xl font-semibold text-gray-800">My Profile</h1>
+          <button
+            onClick={handleLogout}
+            className="flex items-center text-sm text-red-600 hover:text-red-800 font-medium transition duration-150 ease-in-out"
+          >
+            <FiLogOut className="mr-1 h-4 w-4" />
+            Logout
+          </button>
+        </div>
+      </div>
+
+      <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        {/* Profile Summary Card */}
+        <div className="bg-white rounded-lg shadow-md overflow-hidden mb-8">
+          <div className="p-6 flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-6">
+            {/* Placeholder for Profile Picture */}
+            <div className="w-20 h-20 bg-gray-300 rounded-full flex items-center justify-center text-gray-500">
+              <FiUser size={40} />
+            </div>
+            <div className="flex-grow text-center sm:text-left">
+              <h2 className="text-2xl font-bold text-gray-900">{profile.name}</h2>
+              <p className="text-sm text-gray-500">{profile.email}</p>
+              <div className="mt-2 flex items-center justify-center sm:justify-start space-x-2">
+                <span className="text-yellow-500 font-semibold">{profile.rating?.toFixed(1) ?? 'N/A'} ⭐</span>
+                <span className="text-gray-400">|</span>
+                <span className="text-sm text-gray-600">{profile.totalTrips ?? 0} Trips</span>
               </div>
+            </div>
+            {/* Online Status Toggle */}
+            <div className="flex flex-col items-center space-y-2">
+               <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${profile.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                 {profile.isActive ? 'Online' : 'Offline'}
+               </span>
               <button
                 onClick={toggleOnlineStatus}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                  profile.isOnline ? 'bg-green-500' : 'bg-gray-200'
-                }`}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 ${profile.isActive ? 'bg-green-600 focus:ring-green-500' : 'bg-gray-300 focus:ring-indigo-500'}`}
               >
-                <span
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                    profile.isOnline ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
+                <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${profile.isActive ? 'translate-x-5' : 'translate-x-0'}`} />
               </button>
             </div>
           </div>
+           {/* Earnings Stat */}
+           <div className="border-t border-gray-200 bg-gray-50 px-6 py-4">
+             <div className="flex justify-between items-center">
+               <span className="text-sm font-medium text-gray-600">Total Earnings</span>
+               <span className="text-lg font-semibold text-gray-900">₹{profile.earnings?.toLocaleString() ?? 'N/A'}</span>
+             </div>
+           </div>
+        </div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-6 border-b">
-            <div className="bg-gray-50 rounded-lg p-4">
-              <h3 className="text-sm font-medium text-gray-500">Total Trips</h3>
-              <p className="mt-1 text-2xl font-semibold text-gray-900">{profile.totalTrips}</p>
+        {/* Edit Button */}
+        {!isEditing && (
+          <div className="mb-6 text-right">
+            <button
+              type="button"
+              onClick={() => {
+                setEditedProfile(JSON.parse(JSON.stringify(profile))); // Deep copy for editing
+                setIsEditing(true);
+              }}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out"
+            >
+              <FiEdit className="-ml-1 mr-2 h-5 w-5" />
+              Edit Profile
+            </button>
+          </div>
+        )}
+
+        {/* Profile Details Form/Display */}
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-6">
+            {/* Personal Information Section */}
+            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-800 flex items-center">
+                  <FiUser className="mr-2 text-gray-500"/> Personal Information
+                </h3>
+              </div>
+              <div className="p-6 grid grid-cols-1 gap-y-4 gap-x-6 sm:grid-cols-6">
+                {/* Name */}
+                <div className="sm:col-span-3">
+                  <label htmlFor="name" className="block text-sm font-medium text-gray-700">Name</label>
+                  <input
+                    type="text" name="name" id="name"
+                    value={isEditing ? (editedProfile.name ?? '') : (profile.name ?? '')}
+                    onChange={handleInputChange} disabled={!isEditing}
+                    className={`mt-1 block w-full rounded-md shadow-sm sm:text-sm ${isEditing ? 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500' : 'bg-gray-100 border-gray-200 text-gray-600 cursor-not-allowed'}`}
+                  />
+                </div>
+                {/* Email */}
+                <div className="sm:col-span-3">
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email</label>
+                  <input
+                    type="email" name="email" id="email"
+                    value={isEditing ? (editedProfile.email ?? '') : (profile.email ?? '')}
+                    onChange={handleInputChange} disabled={!isEditing}
+                    className={`mt-1 block w-full rounded-md shadow-sm sm:text-sm ${isEditing ? 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500' : 'bg-gray-100 border-gray-200 text-gray-600 cursor-not-allowed'}`}
+                  />
+                </div>
+                {/* Phone */}
+                <div className="sm:col-span-3">
+                  <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">Phone Number</label>
+                  <input
+                    type="tel" name="phoneNumber" id="phoneNumber"
+                    value={isEditing ? (editedProfile.phoneNumber ?? '') : (profile.phoneNumber ?? '')}
+                    onChange={handleInputChange} disabled={!isEditing}
+                    className={`mt-1 block w-full rounded-md shadow-sm sm:text-sm ${isEditing ? 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500' : 'bg-gray-100 border-gray-200 text-gray-600 cursor-not-allowed'}`}
+                  />
+                </div>
+                 {/* Driving License Number */}
+                 <div className="sm:col-span-3">
+                   <label htmlFor="drivingLicense.number" className="block text-sm font-medium text-gray-700">Driving License No.</label>
+                   <input
+                     type="text" name="drivingLicense.number" id="drivingLicense.number"
+                     value={isEditing ? (editedProfile.drivingLicense?.number ?? '') : (profile.drivingLicense?.number ?? '')}
+                     onChange={handleInputChange} disabled={!isEditing}
+                     className={`mt-1 block w-full rounded-md shadow-sm sm:text-sm ${isEditing ? 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500' : 'bg-gray-100 border-gray-200 text-gray-600 cursor-not-allowed'}`}
+                   />
+                 </div>
+                 {/* Driving License Expiry */}
+                 <div className="sm:col-span-3">
+                   <label htmlFor="drivingLicense.expiryDate" className="block text-sm font-medium text-gray-700">License Expiry Date</label>
+                   <input
+                     type={isEditing ? "date" : "text"} // Change type for editing
+                     name="drivingLicense.expiryDate" id="drivingLicense.expiryDate"
+                     value={isEditing ? formatDate(editedProfile.drivingLicense?.expiryDate) : formatDate(profile.drivingLicense?.expiryDate)}
+                     onChange={handleInputChange} disabled={!isEditing}
+                     className={`mt-1 block w-full rounded-md shadow-sm sm:text-sm ${isEditing ? 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500' : 'bg-gray-100 border-gray-200 text-gray-600 cursor-not-allowed'}`}
+                   />
+                 </div>
+              </div>
             </div>
-            <div className="bg-gray-50 rounded-lg p-4">
-              <h3 className="text-sm font-medium text-gray-500">Rating</h3>
-              <p className="mt-1 text-2xl font-semibold text-gray-900">{profile.rating.toFixed(1)} ⭐</p>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-4">
-              <h3 className="text-sm font-medium text-gray-500">Total Earnings</h3>
-              <p className="mt-1 text-2xl font-semibold text-gray-900">₹{profile.earnings}</p>
+
+            {/* Vehicle Information Section */}
+            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-800 flex items-center">
+                  <FiTruck className="mr-2 text-gray-500"/> Vehicle Information
+                </h3>
+              </div>
+              <div className="p-6 grid grid-cols-1 gap-y-4 gap-x-6 sm:grid-cols-6">
+                {/* Make */}
+                <div className="sm:col-span-3">
+                  <label htmlFor="vehicle.make" className="block text-sm font-medium text-gray-700">Make</label>
+                  <input
+                    type="text" name="vehicle.make" id="vehicle.make"
+                    value={isEditing ? (editedProfile.vehicle?.make ?? '') : (profile.vehicle?.make ?? '')}
+                    onChange={handleInputChange} disabled={!isEditing}
+                    className={`mt-1 block w-full rounded-md shadow-sm sm:text-sm ${isEditing ? 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500' : 'bg-gray-100 border-gray-200 text-gray-600 cursor-not-allowed'}`}
+                  />
+                </div>
+                {/* Model */}
+                <div className="sm:col-span-3">
+                  <label htmlFor="vehicle.model" className="block text-sm font-medium text-gray-700">Model</label>
+                  <input
+                    type="text" name="vehicle.model" id="vehicle.model"
+                    value={isEditing ? (editedProfile.vehicle?.model ?? '') : (profile.vehicle?.model ?? '')}
+                    onChange={handleInputChange} disabled={!isEditing}
+                    className={`mt-1 block w-full rounded-md shadow-sm sm:text-sm ${isEditing ? 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500' : 'bg-gray-100 border-gray-200 text-gray-600 cursor-not-allowed'}`}
+                  />
+                </div>
+                {/* Year */}
+                <div className="sm:col-span-2">
+                  <label htmlFor="vehicle.year" className="block text-sm font-medium text-gray-700">Year</label>
+                  <input
+                    type="number" name="vehicle.year" id="vehicle.year"
+                    value={isEditing ? (editedProfile.vehicle?.year ?? '') : (profile.vehicle?.year ?? '')}
+                    onChange={handleInputChange} disabled={!isEditing}
+                    className={`mt-1 block w-full rounded-md shadow-sm sm:text-sm ${isEditing ? 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500' : 'bg-gray-100 border-gray-200 text-gray-600 cursor-not-allowed'}`}
+                  />
+                </div>
+                {/* Color */}
+                <div className="sm:col-span-2">
+                  <label htmlFor="vehicle.color" className="block text-sm font-medium text-gray-700">Color</label>
+                  <input
+                    type="text" name="vehicle.color" id="vehicle.color"
+                    value={isEditing ? (editedProfile.vehicle?.color ?? '') : (profile.vehicle?.color ?? '')}
+                    onChange={handleInputChange} disabled={!isEditing}
+                    className={`mt-1 block w-full rounded-md shadow-sm sm:text-sm ${isEditing ? 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500' : 'bg-gray-100 border-gray-200 text-gray-600 cursor-not-allowed'}`}
+                  />
+                </div>
+                {/* License Plate */}
+                <div className="sm:col-span-2">
+                  <label htmlFor="vehicle.licensePlate" className="block text-sm font-medium text-gray-700">License Plate</label>
+                  <input
+                    type="text" name="vehicle.licensePlate" id="vehicle.licensePlate"
+                    value={isEditing ? (editedProfile.vehicle?.licensePlate ?? '') : (profile.vehicle?.licensePlate ?? '')}
+                    onChange={handleInputChange} disabled={!isEditing}
+                    className={`mt-1 block w-full rounded-md shadow-sm sm:text-sm ${isEditing ? 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500' : 'bg-gray-100 border-gray-200 text-gray-600 cursor-not-allowed'}`}
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Profile Form */}
-          <form onSubmit={handleSubmit} className="p-6">
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Personal Information</h3>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Name</label>
-                    <input
-                      type="text"
-                      name="name"
-                      value={isEditing ? editedProfile.name : profile.name}
-                      onChange={handleInputChange}
-                      disabled={!isEditing}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Email</label>
-                    <input
-                      type="email"
-                      name="email"
-                      value={isEditing ? editedProfile.email : profile.email}
-                      onChange={handleInputChange}
-                      disabled={!isEditing}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Phone</label>
-                    <input
-                      type="tel"
-                      name="phone"
-                      value={isEditing ? editedProfile.phoneNumber : profile.phoneNumber}
-                      onChange={handleInputChange}
-                      disabled={!isEditing}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Vehicle Information</h3>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Make</label>
-                    <input
-                      type="text"
-                      name="vehicle.make"
-                      value={isEditing ? editedProfile.vehicle?.make : profile.vehicle?.make}
-                      onChange={handleInputChange}
-                      disabled={!isEditing}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Model</label>
-                    <input
-                      type="text"
-                      name="vehicle.model"
-                      value={isEditing ? editedProfile.vehicle?.model : profile.vehicle?.model}
-                      onChange={handleInputChange}
-                      disabled={!isEditing}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Year</label>
-                    <input
-                      type="number"
-                      name="vehicle.year"
-                      value={isEditing ? editedProfile.vehicle?.year : profile.vehicle?.year}
-                      onChange={handleInputChange}
-                      disabled={!isEditing}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Color</label>
-                    <input
-                      type="text"
-                      name="vehicle.color"
-                      value={isEditing ? editedProfile.vehicle?.color : profile.vehicle?.color}
-                      onChange={handleInputChange}
-                      disabled={!isEditing}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">License Plate</label>
-                    <input
-                      type="text"
-                      name="vehicle.licensePlate"
-                      value={isEditing ? editedProfile.vehicle?.licensePlate : profile.vehicle?.licensePlate}
-                      onChange={handleInputChange}
-                      disabled={!isEditing}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                    />
-                  </div>
-                </div>
-              </div>
+          {/* Action Buttons */}
+          {isEditing && (
+            <div className="mt-8 flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditing(false);
+                  setEditedProfile({}); // Clear edits
+                }}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out"
+              >
+                 <FiXCircle className="-ml-1 mr-2 h-5 w-5 text-gray-500"/>
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-150 ease-in-out"
+              >
+                 <FiCheckCircle className="-ml-1 mr-2 h-5 w-5"/>
+                Save Changes
+              </button>
             </div>
-
-            <div className="mt-6 flex justify-end space-x-3">
-              {isEditing ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsEditing(false);
-                      setEditedProfile(profile);
-                    }}
-                    className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                  >
-                    Save Changes
-                  </button>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setIsEditing(true)}
-                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                  Edit Profile
-                </button>
-              )}
-            </div>
-          </form>
-        </div>
+          )}
+        </form>
       </div>
     </div>
   );

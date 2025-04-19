@@ -1,6 +1,6 @@
 import React from "react";
 import { Routes, Route } from "react-router-dom";
-import { UserProvider } from "./components/UserContext.jsx";
+import { UserProvider } from "./context/UserContext.jsx";
 import Home from "./pages/Home";
 import "remixicon/fonts/remixicon.css";
 import Signup from "./pages/otp authentication/Signup";
