@@ -1,5 +1,4 @@
 const Captain = require('../models/captain.model');
-const Trip = require('../models/Trip');
 const { validationResult } = require('express-validator');
 const { hashPassword } = require('../services/hashPassword');
 const { generateToken } = require('../services/JWToken'); // Updated import for JWT token generation
@@ -161,40 +160,40 @@ const getCaptainDetails = async (req, res) => {
 };
 
 // Helper function to calculate captain statistics
-const calculateCaptainStats = async (captainId) => {
-  try {
-    // Get completed trips
-    const completedTrips = await Trip.find({
-      captain: captainId,
-      status: 'completed'
-    });
+// const calculateCaptainStats = async (captainId) => {
+//   try {
+//     // Get completed trips
+//     const completedTrips = await Trip.find({
+//       captain: captainId,
+//       status: 'completed'
+//     });
 
-    // Calculate total trips
-    const totalTrips = completedTrips.length;
+//     // Calculate total trips
+//     const totalTrips = completedTrips.length;
 
-    // Calculate total earnings
-    const totalEarnings = completedTrips.reduce((sum, trip) => sum + trip.fare, 0);
+//     // Calculate total earnings
+//     const totalEarnings = completedTrips.reduce((sum, trip) => sum + trip.fare, 0);
 
-    // Calculate average rating
-    const ratings = completedTrips.map(trip => trip.rating).filter(rating => rating);
-    const averageRating = ratings.length > 0
-      ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length
-      : 0;
+//     // Calculate average rating
+//     const ratings = completedTrips.map(trip => trip.rating).filter(rating => rating);
+//     const averageRating = ratings.length > 0
+//       ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length
+//       : 0;
 
-    return {
-      totalTrips,
-      totalEarnings,
-      rating: averageRating
-    };
-  } catch (error) {
-    console.error('Error calculating captain stats:', error);
-    return {
-      totalTrips: 0,
-      totalEarnings: 0,
-      rating: 0
-    };
-  }
-};
+//     return {
+//       totalTrips,
+//       totalEarnings,
+//       rating: averageRating
+//     };
+//   } catch (error) {
+//     console.error('Error calculating captain stats:', error);
+//     return {
+//       totalTrips: 0,
+//       totalEarnings: 0,
+//       rating: 0
+//     };
+//   }
+// };
 
 // Update captain details
 const updateCaptainDetails = async (req, res) => {

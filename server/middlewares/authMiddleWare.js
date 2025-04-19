@@ -5,27 +5,29 @@ const Captain = require('../models/captain.model');
 const protect = async (req, res, next) => {
     let token;
 
-    // Check for token in headers
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
         try {
-            // Get token from header
             token = req.headers.authorization.split(' ')[1];
-
-            // Verify token
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-            // Check if the user is a captain or a regular user
-            const user = await User.findById(decoded.id).select('-password');
-            const captain = await Captain.findById(decoded.id).select('-password');
+            console.log("Decoded token:", decoded); // 👈 LOG HERE
 
-            // Assign user or captain to req.user based on existence
-            req.user = user || captain;
+            let user;
+            if (decoded.role === 'captain') {
+                user = await Captain.findById(decoded.id).select('-password');
+            } else {
+                user = await User.findById(decoded.id).select('-password');
+            }
+
+            console.log("Fetched user:", user); // 👈 AND LOG HERE
+
+            req.user = user;
 
             if (!req.user) {
                 return res.status(401).json({ message: 'Not authorized, token failed' });
             }
 
-            next(); // Proceed to the next middleware or route handler
+            next();
         } catch (error) {
             console.error(error);
             res.status(401).json({ message: 'Not authorized, token failed' });
@@ -37,15 +39,25 @@ const protect = async (req, res, next) => {
     }
 };
 
-// Middleware to authorize based on user role
-const authorize = (...roles) => {
+
+// Middleware to authorize based on user or captain model
+const authorize = (expectedRole) => {
     return (req, res, next) => {
-        if (!roles.includes(req.user.role)) {
-            return res.status(403).json({ message: 'Not authorized to access this route' });
-        }
-        next();
+      if (!req.user || req.user.role !== expectedRole) {
+        return res.status(403).json({
+          message: `Not authorized to access this route, Expected role: ${expectedRole}`
+        });
+      }
+      next();
     };
+  };
+  
+
+const generateToken = (id, role) => {
+    return jwt.sign({ id, role }, process.env.JWT_SECRET, {
+        expiresIn: '30d', // Adjust expiration as needed
+    });
 };
 
-module.exports = { protect, authorize };
+module.exports = { protect, authorize, generateToken };
 

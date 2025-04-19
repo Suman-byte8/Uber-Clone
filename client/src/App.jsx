@@ -17,6 +17,7 @@ import UserAccount from "./pages/user/UserAccount";
 import UserLogin from "./pages/user/UserLogin";
 import ChooseRidePanel from "./components/ChooseRidePanel";
 import ProtectedRoute from "./components/ProtectedRoute";
+import CaptainProtectedWrapper from './components/CaptainProtectedWrapper';
 
 const App = () => {
   return (
@@ -51,14 +52,14 @@ const App = () => {
 
         {/* Protected Captain Routes */}
         <Route path="/captain-home" element={
-          <ProtectedRoute requiredRole="captain">
+          <CaptainProtectedWrapper>
             <CaptainHome />
-          </ProtectedRoute>
+          </CaptainProtectedWrapper>
         } />
         <Route path="/captain-home/profile" element={
-          <ProtectedRoute requiredRole="captain">
+          <CaptainProtectedWrapper>
             <CaptainProfile />
-          </ProtectedRoute>
+          </CaptainProtectedWrapper>
         } />
 
         {/* Test Route */}

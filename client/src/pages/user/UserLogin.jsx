@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
-import { useUserContext } from "../../components/UserContext"; // Import UserContext
+import { useUserContext } from "../../components/UserContext";
 
 const UserLogin = () => {
-    const { setUserId } = useUserContext(); // Access setUserId from context
+    const { login } = useUserContext(); // Change this line to get login function
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -13,7 +13,7 @@ const UserLogin = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setError(''); // Clear previous errors
+        setError('');
 
         try {
             const response = await axios.post(`${import.meta.env.VITE_BASE_URL}/api/user/login`, {
@@ -22,11 +22,9 @@ const UserLogin = () => {
             });
 
             setSuccess('Login successful!');
-            const userId = response.data._id; // Get user ID from response
-            setUserId(userId); // Set userId in context
-            localStorage.setItem('token', response.data.token);
-            localStorage.setItem('userId', userId); // Store userId in local storage
-            navigate('/user-home'); // Redirect to user home page
+            const userId = response.data._id;
+            login(response.data.token, userId, 'user'); // Use the login function instead
+            navigate('/user-home');
         } catch (error) {
             console.error('Error logging in:', error);
             setError('Invalid email or password. Please try again.');

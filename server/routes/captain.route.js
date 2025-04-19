@@ -8,7 +8,7 @@ const {
   updateCaptainDetails, 
   toggleOnlineStatus 
 } = require('../controllers/captain.controller');
-const { protect, authorize } = require('../middleware/auth');
+const { protect, authorize } = require('../middlewares/authMiddleWare');
 
 // Captain signup route with validation
 router.post('/signup', [
