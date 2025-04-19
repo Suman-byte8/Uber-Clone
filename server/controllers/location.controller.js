@@ -2,6 +2,7 @@ const axios = require('axios');
 const NOMINATIM_API_BASE_URL = 'https://nominatim.openstreetmap.org/search';
 const User = require('../models/user.model')
 const mongoose = require('mongoose');
+const Captain = require('../models/captain.model'); // Import Captain model
 
 
 // Location suggestion controller
@@ -79,25 +80,35 @@ const getCoordinates = async (req, res) => {
 };
 
 // Controller: Update User Location
-const updateUserLocation = async (req, res) => {
-    const { userId, lat, lon } = req.body;
+const updateLocation = async (req, res) => {
+    const { userId, lat, lon, role } = req.body;
 
-    if (!userId || !lat || !lon) {
-        return res.status(400).json({ message: 'userId, lat, and lon are required' });
+    // Log the incoming data for debugging
+    console.log('Received data:', { userId, lat, lon, role });
+
+    if (!userId || !lat || !lon || !role) {
+        return res.status(400).json({ message: 'userId, lat, lon, and role are required' });
     }
-
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
         return res.status(400).json({ message: 'Invalid userId format' });
     }
 
-
     try {
-        const user = await User.findByIdAndUpdate(
-            userId,
-            { 'currentLocation.lat': lat, 'currentLocation.lon': lon },
-            { new: true } // Return the updated document
-        );
+        let user;
+        if (role === 'captain') {
+            user = await Captain.findByIdAndUpdate(
+                userId,
+                { 'currentLocation.lat': lat, 'currentLocation.lon': lon },
+                { new: true }
+            );
+        } else {
+            user = await User.findByIdAndUpdate(
+                userId,
+                { 'currentLocation.lat': lat, 'currentLocation.lon': lon },
+                { new: true }
+            );
+        }
 
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
@@ -110,7 +121,4 @@ const updateUserLocation = async (req, res) => {
     }
 };
 
-
-
-
-module.exports = { getSuggestions, getCoordinates, updateUserLocation };
+module.exports = { getSuggestions, getCoordinates, updateLocation };

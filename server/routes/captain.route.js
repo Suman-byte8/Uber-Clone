@@ -6,7 +6,8 @@ const {
   loginCaptain, 
   getCaptainDetails, 
   updateCaptainDetails, 
-  toggleOnlineStatus 
+  toggleOnlineStatus,
+  updateLocation
 } = require('../controllers/captain.controller');
 const { protect, authorize } = require('../middlewares/authMiddleWare');
 
@@ -36,6 +37,9 @@ router.post('/login', [
     body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters long')
 ], loginCaptain);
 
+// Update captain location route
+router.put('/:captainId/location', protect, authorize('captain'), updateLocation);
+
 // Get captain details route
 router.get('/:captainId', protect, authorize('captain'), getCaptainDetails);
 
@@ -54,5 +58,6 @@ router.put('/:captainId', [
 
 // Toggle captain active status
 router.put('/:captainId/toggle-status', protect, authorize('captain'), toggleOnlineStatus);
+
 
 module.exports = router;

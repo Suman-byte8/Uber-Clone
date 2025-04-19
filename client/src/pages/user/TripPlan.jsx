@@ -118,6 +118,7 @@ const TripPlan = () => {
           lat: currentLocation.lat,
           lon: currentLocation.lon,
           userId,
+          role: "user"
         });
       } catch (e) {
         console.error("Error updating user location:", e);

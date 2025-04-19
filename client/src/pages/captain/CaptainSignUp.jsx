@@ -1,10 +1,10 @@
 import React, { useState } from "react";
-import { useUserContext } from "../../context/UserContext"; // Import UserContext
+import { useUserContext } from "../../context/UserContext"; // Ensure correct import
 import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
 
 const CaptainSignUp = () => {
-  const { setCaptainId } = useUserContext(); // Access setCaptainId from context
+  const { setCaptainId } = useUserContext(); // Ensure setCaptainId is accessed correctly
   const [formData, setFormData] = useState({
     name: "",
     email: "",

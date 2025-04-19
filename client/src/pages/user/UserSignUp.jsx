@@ -1,11 +1,11 @@
 import React, { useState } from "react";
+import { useUserContext } from "../../context/UserContext"; // Ensure correct import
 import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
-import { useUserContext } from "../../context/UserContext"; // Import UserContext
  // Import UserContext
 
 const UserSignUp = () => {
-  const { setUserId } = useUserContext(); // Access setUserId from context
+  const { setUserId } = useUserContext(); // Ensure setUserId is accessed correctly
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -46,7 +46,7 @@ const UserSignUp = () => {
         setUserId(userId); // Set userId in context
         localStorage.setItem("userToken", response.data.token);
         localStorage.setItem("userId", userId); // Store userId in local storage
-        navigate('/user-home');
+        navigate('/user-home'); // Ensure this line is executed
       }
       // Handle success (e.g., redirect or success message)
     } catch (err) {

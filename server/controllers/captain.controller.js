@@ -266,10 +266,37 @@ const toggleOnlineStatus = async (req, res) => {
   }
 };
 
+const updateLocation = async (req, res) => {
+  try {
+    const { lat, lng } = req.body;
+    const captain = await Captain.findByIdAndUpdate(
+      req.params.captainId,
+      { 
+        currentLocation: {
+          lat:lat,
+          lng:lng
+        }
+      },
+      { new: true }
+    );
+
+    res.status(200).json({
+      success: true,
+      data: captain
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error updating location'
+    });
+  }
+};
+
 module.exports = {
   registerCaptain,
   loginCaptain,
   getCaptainDetails,
   updateCaptainDetails,
-  toggleOnlineStatus
+  toggleOnlineStatus,
+  updateLocation
 };

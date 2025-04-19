@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 // Create a context for user and captain IDs
 const UserContext = createContext();
@@ -8,6 +9,8 @@ export const UserProvider = ({ children }) => {
   const [userId, setUserId] = useState(localStorage.getItem('userId'));
   const [captainId, setCaptainId] = useState(localStorage.getItem('captainId'));
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
+
+  const navigate = useNavigate();
 
   const login = (token, id, role) => {
     localStorage.setItem('token', token);
@@ -28,6 +31,7 @@ export const UserProvider = ({ children }) => {
     setUserId(null);
     setCaptainId(null);
     setIsAuthenticated(false);
+    navigate("/")
   };
 
   useEffect(() => {
@@ -41,7 +45,9 @@ export const UserProvider = ({ children }) => {
   return (
     <UserContext.Provider value={{
       userId,
+      setUserId, // Add setUserId to the context value
       captainId,
+      setCaptainId, // Add setCaptainId to the context value
       isAuthenticated,
       login,
       logout,

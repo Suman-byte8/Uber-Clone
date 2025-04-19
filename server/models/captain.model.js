@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
-const { Schema } = mongoose;
 
-const captainSchema = new Schema({
+const captainSchema = new mongoose.Schema({
     name: {
         type: String,
         required: [true, 'Name is required'],
@@ -49,7 +48,7 @@ const captainSchema = new Schema({
             required: [true, 'Vehicle make is required']
         },
         model: {
-            type: String, 
+            type: String,
             required: [true, 'Vehicle model is required']
         },
         year: {
@@ -87,10 +86,25 @@ const captainSchema = new Schema({
     updatedAt: {
         type: Date,
         default: Date.now
-    }
+    },
+    currentLocation: {
+        lat: {
+            type: Number,
+            required: true,
+            default: 0
+        }, // Latitude
+        lon: {
+            type: Number,
+            required: true,
+            default: 0
+        },  // Longitude
+    },
 }, {
     timestamps: true
 });
+
+// Ensure 2dsphere index for geospatial queries
+captainSchema.index({ location: '2dsphere' });
 
 module.exports = mongoose.model('Captain', captainSchema);
 
