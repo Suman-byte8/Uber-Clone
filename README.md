@@ -439,8 +439,40 @@ const errorHandler = (err, req, res, next) => {
 
 module.exports = errorHandler;
 ```
+### Captain Profile Integration
 
-[Previous sections remain the same]
+#### 1. Get Captain Profile
+- **GET** `/api/captains/profile`
+- **Description**: Fetch the logged-in captain's profile details
+- **Headers**: `Authorization: Bearer <token>`
+- **Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "_id": "64e1c2f8b7e6e2b1c8a9f123",
+    "name": "Alice Navigator",
+    "email": "alice.navigator@example.com",
+    "phoneNumber": "+198765432109",
+    "vehicle": {
+      "make": "Ford",
+      "model": "Mustang",
+      "year": 2023,
+      "color": "Rapid Red",
+      "licensePlate": "FORD999"
+    },
+    "drivingLicense": {
+      "number": "DL9876543210",
+      "expiryDate": "2035-07-15T00:00:00.000Z"
+    },
+    "rating": 4.8,
+    "isActive": true,
+    "isVerified": true,
+    "totalTrips": 150, // Example field
+    "earnings": 12500 // Example field
+  }
+}
+```
 
 ## Real-time Communication
 
@@ -515,6 +547,7 @@ socket.on('connect', () => {
    - `ride_request`: When user requests a ride
    - `new_ride_request`: Notifies captains of new requests
    - `location_update`: Real-time captain location updates
+   - `ride_status`: Updates on ride progress
    - `ride_status`: Updates on ride progress
 
 3. **Use Cases**
