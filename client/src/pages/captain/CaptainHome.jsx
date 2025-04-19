@@ -15,7 +15,7 @@ const CaptainHome = () => {
   const [driverLocation, setDriverLocation] = useState(null);
   const [mapInstance, setMapInstance] = useState(null);
   const { captainId: contextCaptainId } = useUserContext();
-  const captainId = contextCaptainId;
+  const captainId = localStorage.getItem("captainId") || contextCaptainId; // Use the ID from context if available;
   const token = localStorage.getItem("token");
 
   useEffect(() => {
@@ -91,7 +91,7 @@ const CaptainHome = () => {
         await axios.put(`${import.meta.env.VITE_BASE_URL}/api/locations/update-location`, {
           lat: driverLocation.lat,
           lon: driverLocation.lon,
-          userId: captainId, // Assuming captainId is the userId for the driver
+          userId: captainId, 
           role: 'captain' // Include the role in the request
         });
       } catch (e) {
