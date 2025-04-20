@@ -67,6 +67,9 @@ const TripPlan = () => {
   });
   const [estimatedTime, setEstimatedTime] = useState(null);
 
+  const [pickupCords, setPickupCords] = useState(null);
+  const [dropoffCords, setDropoffCords] = useState(null);
+
   // function to fetch suggestions 
   const fetchSuggestions = async (query, setState) => {
     if (!query.trim()) return;
@@ -200,7 +203,17 @@ const TripPlan = () => {
       );
 
       const pickupData = pickupResponse.data;
+      if (pickupData.length > 0) {
+        setPickupCords({ lat: parseFloat(pickupData[0].lat), lng: parseFloat(pickupData[0].lon) });
+      } else {
+        setPickupCords(null);
+      }
       const dropoffData = dropoffResponse.data;
+      if (dropoffData.length > 0) {
+        setDropoffCords({ lat: parseFloat(dropoffData[0].lat), lng: parseFloat(dropoffData[0].lon) });
+      } else {
+        setDropoffCords(null);
+      }
 
       if (pickupData.length > 0 && dropoffData.length > 0) {
         const pickup = pickupData[0];
@@ -331,6 +344,8 @@ const TripPlan = () => {
           prices={prices}
           estimatedTime={estimatedTime}
           pricingTiers={PRICING_TIERS}
+          pickupData={pickupCords}
+          dropoffData={dropoffCords}
         />
       )}
     </div>

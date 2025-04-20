@@ -52,6 +52,10 @@ const connectedCaptains = {}; // { captainId: { socketId: socket.id, location: {
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}, Role: ${socket.role}, ID: ${socket.userId}`);
 
+  // Log current connected users and captains count and their IDs
+  console.log('Currently connected users:', Object.keys(connectedUsers));
+  console.log('Currently connected captains:', Object.keys(connectedCaptains));
+
   // --- Register User/Captain ---
   if (socket.role === 'captain') {
     connectedCaptains[socket.userId] = { socketId: socket.id, isOnline: true, location: null };
@@ -90,33 +94,138 @@ io.on('connection', (socket) => {
   });
 
   // --- User Events ---
-  socket.on('requestRide', (data) => {
-    // data: { userId, pickupLocation, destinationLocation, etc. }
+  const rides = {}; // In-memory store for rides: rideId -> { userId, pickupLocation, dropoffLocation, status, captainId }
+
+  const generateRideId = () => {
+    return Math.random().toString(36).substr(2, 9);
+  };
+
+  const Captain = require('./models/captain.model');
+
+  socket.on('requestRide', async (data) => {
     if (socket.role === 'user') {
-       console.log(`Ride request from user ${socket.userId}:`, data);
-       // TODO: Find nearby available captains
-       // 1. Filter `connectedCaptains` for `isOnline === true` and proximity to `pickupLocation`
-       // 2. Emit 'newRideRequest' to each suitable captain's socketId
-       // io.to(captainSocketId).emit('newRideRequest', { rideDetails: data, rideId: newRideId });
+      console.log(`Ride request from user ${socket.userId}:`, data);
+
+      // Find active captains from DB
+      let activeCaptains;
+      try {
+        activeCaptains = await Captain.find({ isActive: true }).select('_id location');
+        console.log(`Active captains fetched from DB: ${activeCaptains.length}`);
+      } catch (err) {
+        console.error('Error fetching active captains from DB:', err);
+        socket.emit('noCaptainsAvailable', { rideId: null });
+        return;
+      }
+
+      const nearbyCaptains = [];
+      const maxDistanceKm = 5; // Define max distance to consider nearby
+
+      const toRadians = (deg) => deg * (Math.PI / 180);
+      const haversineDistance = (loc1, loc2) => {
+        const R = 6371; // Earth radius in km
+        const dLat = toRadians(loc2.lat - loc1.lat);
+        const dLon = toRadians(loc2.lng - loc1.lng);
+        const lat1 = toRadians(loc1.lat);
+        const lat2 = toRadians(loc2.lat);
+
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                  Math.cos(lat1) * Math.cos(lat2) *
+                  Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+      };
+
+      console.log('Pickup location received:', data.pickupLocation);
+
+      for (const captain of activeCaptains) {
+        const captainId = captain._id.toString();
+        const info = connectedCaptains[captainId];
+        let captainLocation = null;
+        if (info && info.location) {
+          captainLocation = info.location;
+          console.log(`Captain ${captainId} location from socket:`, captainLocation);
+        } else if (captain.location) {
+          captainLocation = { lat: captain.location.coordinates[1], lng: captain.location.coordinates[0] };
+          console.log(`Captain ${captainId} location from DB:`, captainLocation);
+        } else {
+          console.log(`Captain ${captainId} location unknown`);
+        }
+
+        if (captainLocation) {
+          const distance = haversineDistance(data.pickupLocation, captainLocation);
+          console.log(`Distance to captain ${captainId}: ${distance} km`);
+          if (distance <= maxDistanceKm) {
+            if (info && info.socketId) {
+              nearbyCaptains.push({ captainId, socketId: info.socketId });
+            } else {
+              console.log(`Captain ${captainId} not connected via socket, cannot notify`);
+            }
+          }
+        }
+      }
+
+      console.log(`Nearby captains found: ${nearbyCaptains.length}`);
+
+      if (nearbyCaptains.length === 0) {
+        // Notify user no captains available
+        socket.emit('noCaptainsAvailable', { rideId: null });
+        return;
+      }
+
+      const rideId = generateRideId();
+      rides[rideId] = {
+        userId: socket.userId,
+        pickupLocation: data.pickupLocation,
+        dropoffLocation: data.dropoffLocation,
+        status: 'requested',
+        captainId: null,
+      };
+
+      // Emit newRideRequest to nearby captains
+      nearbyCaptains.forEach(({ captainId, socketId }) => {
+        io.to(socketId).emit('newRideRequest', { rideDetails: data, rideId });
+      });
+
+      // Acknowledge to user
+      socket.emit('requestRide', { status: 'received', rideId });
     }
   });
 
   // --- Ride Lifecycle Events ---
   socket.on('acceptRide', (data) => {
-    // data: { rideId, captainId }
     if (socket.role === 'captain') {
       console.log(`Captain ${socket.userId} accepted ride ${data.rideId}`);
-      // TODO:
-      // 1. Update ride status in DB
-      // 2. Notify the specific user who requested the ride
-      // const userSocketId = findUserSocketIdByRideId(data.rideId); // Need logic to map rideId to userId/socketId
-      // if (userSocketId) {
-      //   io.to(userSocketId).emit('rideAccepted', { rideId: data.rideId, captainDetails: getCaptainDetails(socket.userId) });
-      //   // Maybe create a room for this specific ride
-      //   const userSocket = io.sockets.sockets.get(userSocketId);
-      //   if (userSocket) socket.join(`ride_${data.rideId}`);
-      //   socket.join(`ride_${data.rideId}`);
-      // }
+
+      const ride = rides[data.rideId];
+      if (!ride) {
+        socket.emit('acceptRideResponse', { status: 'error', message: 'Ride not found' });
+        return;
+      }
+
+      if (ride.status !== 'requested') {
+        socket.emit('acceptRideResponse', { status: 'error', message: 'Ride already accepted or completed' });
+        return;
+      }
+
+      // Update ride status and assign captain
+      ride.status = 'accepted';
+      ride.captainId = socket.userId;
+
+      // Notify the user who requested the ride
+      const userSocketId = connectedUsers[ride.userId];
+      if (userSocketId) {
+        const captainDetails = {
+          id: socket.userId,
+          // Add more captain details as needed, e.g., name, vehicle, rating
+        };
+        io.to(userSocketId).emit('rideAccepted', { rideId: data.rideId, captainDetails });
+      }
+
+      // Optionally join ride room
+      socket.join(`ride_${data.rideId}`);
+
+      // Acknowledge to captain
+      socket.emit('acceptRideResponse', { status: 'success', rideId: data.rideId });
     }
   });
 
