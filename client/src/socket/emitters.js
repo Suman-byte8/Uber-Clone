@@ -1,16 +1,14 @@
-import { getSocket } from './index';
-import * as events from './events';
-
 /**
  * Socket event emitters
  * 
  * This module provides functions to emit socket events to the server.
- * Each function handles a specific type of event and ensures the socket
- * is properly initialized before emitting.
+ * Each function now accepts a socket instance parameter to ensure
+ * the authenticated socket from context is used.
  */
 
 /**
  * Update the user's location
+ * @param {Object} socket - The socket instance to use
  * @param {Object} locationData - The location data to send
  * @param {number} locationData.lat - Latitude
  * @param {number} locationData.lon - Longitude
@@ -18,10 +16,9 @@ import * as events from './events';
  * @param {string} locationData.role - User role (user/captain)
  * @returns {boolean} - True if the event was emitted, false otherwise
  */
-export const updateLocation = (locationData) => {
-  const socket = getSocket();
+export const updateLocation = (socket, locationData) => {
   if (socket && socket.connected) {
-    socket.emit(events.UPDATE_LOCATION, locationData);
+    socket.emit('updateLocation', locationData);
     return true;
   }
   console.warn('Socket not connected. Location update not sent.');
@@ -30,6 +27,7 @@ export const updateLocation = (locationData) => {
 
 /**
  * Request a ride
+ * @param {Object} socket - The socket instance to use
  * @param {Object} rideData - The ride request data
  * @param {string} rideData.userId - User ID requesting the ride
  * @param {Object} rideData.pickup - Pickup location {lat, lon, address}
@@ -39,10 +37,9 @@ export const updateLocation = (locationData) => {
  * @param {number} rideData.estimatedTime - Estimated time in minutes
  * @returns {boolean} - True if the event was emitted, false otherwise
  */
-export const requestRide = (rideData) => {
-  const socket = getSocket();
+export const requestRide = (socket, rideData) => {
   if (socket && socket.connected) {
-    socket.emit(events.REQUEST_RIDE, {
+    socket.emit('requestRide', {
       ...rideData,
       requestTime: new Date().toISOString()
     });
@@ -54,6 +51,7 @@ export const requestRide = (rideData) => {
 
 /**
  * Accept a ride request (for captains)
+ * @param {Object} socket - The socket instance to use
  * @param {Object} acceptData - The ride acceptance data
  * @param {string} acceptData.rideId - ID of the ride being accepted
  * @param {string} acceptData.captainId - ID of the captain accepting the ride
@@ -61,10 +59,9 @@ export const requestRide = (rideData) => {
  * @param {number} acceptData.estimatedArrival - Estimated arrival time in minutes
  * @returns {boolean} - True if the event was emitted, false otherwise
  */
-export const acceptRide = (acceptData) => {
-  const socket = getSocket();
+export const acceptRide = (socket, acceptData) => {
   if (socket && socket.connected) {
-    socket.emit(events.ACCEPT_RIDE, {
+    socket.emit('acceptRide', {
       ...acceptData,
       acceptTime: new Date().toISOString()
     });
@@ -76,11 +73,11 @@ export const acceptRide = (acceptData) => {
 
 /**
  * Join a specific room (for private communications)
+ * @param {Object} socket - The socket instance to use
  * @param {string} roomId - The room ID to join
  * @returns {boolean} - True if the event was emitted, false otherwise
  */
-export const joinRoom = (roomId) => {
-  const socket = getSocket();
+export const joinRoom = (socket, roomId) => {
   if (socket && socket.connected) {
     socket.emit('join', { roomId });
     return true;
@@ -91,11 +88,11 @@ export const joinRoom = (roomId) => {
 
 /**
  * Leave a specific room
+ * @param {Object} socket - The socket instance to use
  * @param {string} roomId - The room ID to leave
  * @returns {boolean} - True if the event was emitted, false otherwise
  */
-export const leaveRoom = (roomId) => {
-  const socket = getSocket();
+export const leaveRoom = (socket, roomId) => {
   if (socket && socket.connected) {
     socket.emit('leave', { roomId });
     return true;
@@ -103,5 +100,3 @@ export const leaveRoom = (roomId) => {
   console.warn('Socket not connected. Could not leave room.');
   return false;
 };
-
-// Add more emitter functions as needed
