@@ -10,6 +10,7 @@ This is the backend system of an online cab booking system. It features user/cap
   - [User Routes](#user-routes)
   - [Captain Routes](#captain-routes)
   - [Location Routes](#location-routes)
+  - [Socket Events](#socket-events)
 - [Data Validation](#data-validation)
 - [Project Structure](#project-structure)
 - [How It Works](#how-it-works)
@@ -24,6 +25,11 @@ This is the backend system of an online cab booking system. It features user/cap
 - Input Validation Middleware
 - Protected Routes
 - OpenStreetMap Integration
+- Real-time Captain Socket Connection
+- Ride Request and Matching System
+- Captain Ride Management (Accept/Reject/Cancel)
+- Browser Notifications for New Rides
+- Real-time Location Tracking
 
 ## Technologies Used
 - **Node.js** - Runtime environment
@@ -34,6 +40,8 @@ This is the backend system of an online cab booking system. It features user/cap
 - **express-validator** - Input validation
 - **React Leaflet** - Map integration
 - **OpenStreetMap API** - Location services
+- **Socket.IO** - Real-time communication
+- **Web Notifications API** - Browser notifications
 
 ## Installation
 
@@ -104,658 +112,471 @@ npm start
 - **Response**:
 ```json
 {
-  "_id": "678a59ce816da4cee492e4c7",
-  "message": "User logged in successfully",
+  "_id": "67892ba437902adc7e3d260c",
+  "name": "John Doe",
+  "email": "johndoe@example.com",
+  "phoneNumber": "1234567890",
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 }
 ```
 
-#### 3. User Profile
+#### 3. Get User Account Details
 - **GET** `/api/users/account`
-- **Description**: Fetch user profile
-- **Headers**: `Authorization: Bearer <token>`
+- **Description**: Get authenticated user details
+- **Headers**:
+```
+Authorization: Bearer <token>
+```
 - **Response**:
 ```json
 {
-  "_id": "678a930536748191acff0891",
-  "name": "John Doe",
-  "email": "johndoe@example.com",
-  "phoneNumber": "1234567890"
+  "success": true,
+  "data": {
+    "_id": "67892ba437902adc7e3d260c",
+    "name": "John Doe",
+    "email": "johndoe@example.com",
+    "phoneNumber": "1234567890"
+  }
+}
+```
+
+#### 4. Get Public User Details
+- **GET** `/api/users/:userId/public`
+- **Description**: Get public user details (for ride matching)
+- **Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "_id": "67892ba437902adc7e3d260c",
+    "name": "John Doe",
+    "phoneNumber": "1234567890",
+    "rating": 4.5
+  }
 }
 ```
 
 ### Captain Routes
 
 #### 1. Captain Signup
-- **POST** `/api/captains/signup`
+- **POST** `/api/captain/signup`
 - **Description**: Register a new captain
 - **Request Body**:
 ```json
 {
-  "name": "Alice Navigator",
-  "email": "alice.navigator@example.com",
-  "phoneNumber": "+198765432109",
-  "password": "securepassword123",
-  "drivingLicense": {
-    "number": "DL9876543210",
-    "expiryDate": "2035-07-15T00:00:00.000Z"
-  },
-  "vehicle": {
-    "make": "Ford",
-    "model": "Mustang",
-    "year": 2023,
-    "color": "Rapid Red",
-    "licensePlate": "FORD999"
+  "name": "Jane Smith",
+  "email": "janesmith@example.com",
+  "phoneNumber": "9876543210",
+  "password": "password123",
+  "vehicleDetails": {
+    "model": "Toyota Camry",
+    "year": 2020,
+    "color": "Black",
+    "licensePlate": "ABC123"
   }
+}
+```
+- **Response**:
+```json
+{
+  "_id": "67892ba437902adc7e3d260d",
+  "name": "Jane Smith",
+  "email": "janesmith@example.com",
+  "phoneNumber": "9876543210",
+  "vehicleDetails": {
+    "model": "Toyota Camry",
+    "year": 2020,
+    "color": "Black",
+    "licensePlate": "ABC123"
+  },
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 }
 ```
 
 #### 2. Captain Login
-- **POST** `/api/captains/login`
+- **POST** `/api/captain/login`
 - **Description**: Authenticate existing captain
 - **Request Body**:
 ```json
 {
-  "email": "alice.navigator@example.com",
-  "password": "securepassword123"
+  "email": "janesmith@example.com",
+  "password": "password123"
 }
 ```
-
-### Location Routes
-
-#### 1. Get Location Suggestions
-- **GET** `/api/locations/suggestions`
-- **Query Parameters**: `query` (location search term)
-- **Description**: Fetch location suggestions from OpenStreetMap
-
-#### 2. Get Coordinates
-- **GET** `/api/locations/get-coordinates`
-- **Query Parameters**: `query` (location name)
-- **Description**: Fetch coordinates for a location
 - **Response**:
 ```json
 {
-  "lat": "25.0057449",
-  "lon": "88.1398483"
+  "_id": "67892ba437902adc7e3d260d",
+  "name": "Jane Smith",
+  "email": "janesmith@example.com",
+  "phoneNumber": "9876543210",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 }
 ```
 
-## Data Validation
-
-### User Validation Rules
-- Name: Required, minimum 3 characters
-- Email: Required, valid email format
-- Phone Number: Required, valid format
-- Password: Required, minimum 8 characters
-
-### Captain Validation Rules
-- All User validation rules plus:
-- Driving License Number: Required, unique
-- Driving License Expiry: Required, valid date
-- Vehicle Details: Make, model, year, color, license plate required
-
-# User Authentication API
-
-[Previous sections remain the same up to Location Routes]
-
-### Location Routes and Services
-
-#### 1. Get Location Suggestions
-- **GET** `/api/locations/suggestions`
-- **Description**: Fetch location suggestions from OpenStreetMap Nominatim API
-- **Query Parameters**: 
-  - `query` (required): Location search term (e.g., "alipurduar")
-- **Response**:
-```json
-[
-  {
-    "place_id": 222689300,
-    "licence": "Data © OpenStreetMap contributors, ODbL 1.0",
-    "osm_type": "node",
-    "osm_id": 568606431,
-    "lat": "26.4851573",
-    "lon": "89.5246926",
-    "class": "place",
-    "type": "city",
-    "place_rank": 16,
-    "importance": 0.4282188878241305,
-    "addresstype": "city",
-    "name": "Alipurduar",
-    "display_name": "Alipurduar, Alipurduar - I, West Bengal, 736121, India",
-    "address": {
-      "city": "Alipurduar",
-      "county": "Alipurduar - I",
-      "state": "West Bengal",
-      "postcode": "736121",
-      "country": "India",
-      "country_code": "in"
-    },
-    "boundingbox": [
-      "26.3251573",
-      "26.6451573",
-      "89.3646926",
-      "89.6846926"
-    ]
-  }
-]
+#### 3. Get Captain Details
+- **GET** `/api/captain/:captainId`
+- **Description**: Get captain details (protected)
+- **Headers**:
 ```
-
-#### 2. Get Coordinates
-- **GET** `/api/locations/get-coordinates`
-- **Description**: Fetch specific coordinates for a location
-- **Query Parameters**:
-  - `query` (required): Location name (e.g., "malda")
-- **Response**:
-```json
-{
-  "lat": "25.0057449",
-  "lon": "88.1398483"
-}
+Authorization: Bearer <token>
 ```
-- **Error Response** (400):
-```json
-{
-  "error": "Location not found"
-}
-```
-
-### Map Integration with React Leaflet
-
-#### 1. Installation and Setup
-
-```bash
-# Install required packages
-npm install react-leaflet leaflet @types/leaflet
-```
-
-Add Leaflet CSS to your index.html:
-```html
-<link
-  rel="stylesheet"
-  href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
-/>
-```
-
-#### 2. Basic Map Component
-
-```jsx
-import React from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import { Icon } from 'leaflet';
-
-// Custom marker icon setup
-const customIcon = new Icon({
-  iconUrl: '/marker-icon.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41]
-});
-
-const Map = ({ position, zoom = 13 }) => {
-  return (
-    <MapContainer
-      center={position}
-      zoom={zoom}
-      style={{ height: '400px', width: '100%' }}
-    >
-      <TileLayer
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-      />
-      <Marker position={position} icon={customIcon}>
-        <Popup>
-          Latitude: {position.lat}<br />
-          Longitude: {position.lng}
-        </Popup>
-      </Marker>
-    </MapContainer>
-  );
-};
-
-export default Map;
-```
-
-
-### Location Controller Implementation
-
-```javascript
-// controllers/location.controller.js
-
-const axios = require('axios');
-
-// Get location suggestions
-exports.getSuggestions = async (req, res) => {
-  try {
-    const { query } = req.query;
-    
-    if (!query) {
-      return res.status(400).json({ error: 'Search query is required' });
-    }
-
-    const response = await axios.get(
-      `https://nominatim.openstreetmap.org/search`,
-      {
-        params: {
-          q: query,
-          format: 'json',
-          addressdetails: 1,
-          limit: 5
-        },
-        headers: {
-          'User-Agent': 'YourAppName/1.0'
-        }
-      }
-    );
-
-    res.json(response.data);
-  } catch (error) {
-    console.error('Location suggestion error:', error);
-    res.status(500).json({ error: 'Failed to fetch location suggestions' });
-  }
-};
-
-// Get coordinates for a location
-exports.getCoordinates = async (req, res) => {
-  try {
-    const { query } = req.query;
-    
-    if (!query) {
-      return res.status(400).json({ error: 'Location query is required' });
-    }
-
-    const response = await axios.get(
-      `https://nominatim.openstreetmap.org/search`,
-      {
-        params: {
-          q: query,
-          format: 'json',
-          limit: 1
-        },
-        headers: {
-          'User-Agent': 'YourAppName/1.0'
-        }
-      }
-    );
-
-    if (response.data.length === 0) {
-      return res.status(400).json({ error: 'Location not found' });
-    }
-
-    const { lat, lon } = response.data[0];
-    res.json({ lat, lon });
-  } catch (error) {
-    console.error('Coordinates fetch error:', error);
-    res.status(500).json({ error: 'Failed to fetch coordinates' });
-  }
-};
-```
-
-### Location Route Implementation
-
-```javascript
-// routes/location.routes.js
-
-const express = require('express');
-const router = express.Router();
-const { 
-  getSuggestions, 
-  getCoordinates 
-} = require('../controllers/location.controller');
-const { protect } = require('../middleware/auth.middleware');
-
-router.get('/suggestions', protect, getSuggestions);
-router.get('/get-coordinates', protect, getCoordinates);
-
-module.exports = router;
-```
-
-### Error Handling Middleware
-
-```javascript
-// middleware/error.middleware.js
-
-const errorHandler = (err, req, res, next) => {
-  console.error(err.stack);
-
-  if (err.name === 'ValidationError') {
-    return res.status(400).json({
-      error: 'Validation Error',
-      details: err.message
-    });
-  }
-
-  if (err.name === 'AxiosError') {
-    return res.status(500).json({
-      error: 'External API Error',
-      details: 'Failed to fetch location data'
-    });
-  }
-
-  res.status(500).json({
-    error: 'Internal Server Error',
-    details: process.env.NODE_ENV === 'development' ? err.message : undefined
-  });
-};
-
-module.exports = errorHandler;
-```
-### Captain Profile Integration
-
-#### 1. Get Captain Profile
-- **GET** `/api/captains/profile`
-- **Description**: Fetch the logged-in captain's profile details
-- **Headers**: `Authorization: Bearer <token>`
 - **Response**:
 ```json
 {
   "success": true,
   "data": {
-    "_id": "64e1c2f8b7e6e2b1c8a9f123",
-    "name": "Alice Navigator",
-    "email": "alice.navigator@example.com",
-    "phoneNumber": "+198765432109",
-    "vehicle": {
-      "make": "Ford",
-      "model": "Mustang",
-      "year": 2023,
-      "color": "Rapid Red",
-      "licensePlate": "FORD999"
+    "_id": "67892ba437902adc7e3d260d",
+    "name": "Jane Smith",
+    "email": "janesmith@example.com",
+    "phoneNumber": "9876543210",
+    "vehicleDetails": {
+      "model": "Toyota Camry",
+      "year": 2020,
+      "color": "Black",
+      "licensePlate": "ABC123"
     },
-    "drivingLicense": {
-      "number": "DL9876543210",
-      "expiryDate": "2035-07-15T00:00:00.000Z"
-    },
-    "rating": 4.8,
     "isActive": true,
-    "isVerified": true,
-    "totalTrips": 150, // Example field
-    "earnings": 12500 // Example field
+    "rating": 4.8
   }
 }
 ```
 
-## Real-time Communication
-
-This project implements real-time communication between users and captains using Socket.IO, enabling instant updates and location tracking.
-
-### Socket.IO Integration
-
-#### Installation
-```bash
-# Server-side
-npm install socket.io
-# Client-side
-npm install socket.io-client
+#### 4. Get Public Captain Details
+- **GET** `/api/captain/:captainId/public`
+- **Description**: Get public captain details (for ride matching)
+- **Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "_id": "67892ba437902adc7e3d260d",
+    "name": "Jane Smith",
+    "phoneNumber": "9876543210",
+    "vehicleDetails": {
+      "model": "Toyota Camry",
+      "color": "Black",
+      "licensePlate": "ABC123"
+    },
+    "rating": 4.8
+  }
+}
 ```
 
-#### Basic Server Setup
-```javascript
-// server.js
-const express = require('express');
-const http = require('http');
-const socketIO = require('socket.io');
+### Location Routes
 
-const app = express();
-const server = http.createServer(app);
-const io = socketIO(server);
-
-io.on('connection', (socket) => {
-  console.log('New client connected');
-
-  // Handle ride request
-  socket.on('ride_request', (data) => {
-    // Emit to available captains
-    io.emit('new_ride_request', data);
-  });
-
-  // Handle location updates
-  socket.on('location_update', (data) => {
-    io.emit('captain_location', data);
-  });
-
-  socket.on('disconnect', () => {
-    console.log('Client disconnected');
-  });
-});
-
-server.listen(5000, () => {
-  console.log('Server running with Socket.IO on port 5000');
-});
+#### 1. Geocode Address
+- **GET** `/api/location/geocode?address=<address>`
+- **Description**: Convert address to coordinates
+- **Response**:
+```json
+{
+  "lat": 40.7128,
+  "lng": -74.0060,
+  "address": "New York, NY, USA"
+}
 ```
 
-#### Basic Client Setup
+#### 2. Reverse Geocode
+- **GET** `/api/location/reverse?lat=<latitude>&lng=<longitude>`
+- **Description**: Convert coordinates to address
+- **Response**:
+```json
+{
+  "address": "New York, NY, USA",
+  "details": {
+    "city": "New York",
+    "state": "NY",
+    "country": "USA",
+    "postal_code": "10001"
+  }
+}
+```
+
+### Socket Events
+
+Socket.IO is used for real-time communication between the server, users, and captains. Below are the key socket events implemented in the system:
+
+#### Authentication
 ```javascript
-// client.js
-import io from 'socket.io-client';
+// Connect with authentication
+const socket = io(serverUrl, {
+  auth: { token: "your-jwt-token" }
+});
 
-const socket = io('http://localhost:5000');
-
-// Connect to Socket.IO server
+// Connection event
 socket.on('connect', () => {
-  console.log('Connected to server');
+  console.log('Connected to socket server with ID:', socket.id);
 });
 ```
 
-### Features
+#### Captain Registration
+```javascript
+// Register captain with the socket server
+socket.emit('registerCaptain', {
+  captainId: "67892ba437902adc7e3d260d",
+  location: {
+    lat: 40.7128,
+    lng: -74.0060
+  },
+  isActive: true
+});
 
-1. **Real-time Updates**
-   - Instant ride request notifications
-   - Live location tracking
-   - Status updates for both users and captains
-
-2. **Event Types**
-   - `ride_request`: When user requests a ride
-   - `new_ride_request`: Notifies captains of new requests
-   - `location_update`: Real-time captain location updates
-   - `ride_status`: Updates on ride progress
-   - `ride_status`: Updates on ride progress
-
-3. **Use Cases**
-   - Ride matching between users and captains
-   - Live tracking during rides
-   - Instant notifications for both parties
-   - Real-time chat functionality (planned)
-
-### Implementation Overview
-
-1. **Server-side Events**
-   - Connection management
-   - Event broadcasting
-   - Room management for private communications
-
-2. **Client-side Integration**
-   - Event listeners for updates
-   - Real-time map updates
-   - Status synchronization
-
-3. **Data Flow**
-   - User requests ride → Server → Available captains
-   - Captain accepts → Server → User notified
-   - Location updates → All relevant parties
-
-### Planned Features
-
-1. **Chat System**
-   - Direct messaging between user and captain
-   - Support for multimedia messages
-
-2. **Enhanced Tracking**
-   - Improved location accuracy
-   - ETA calculations
-   - Route visualization
-
-3. **Status Updates**
-   - Ride progress notifications
-   - Payment status
-   - Rating system
-
-[Rest of the documentation remains the same]
-
-## Project Structure
-```
-.
-├── controllers/
-│   ├── user.controller.js
-│   ├── captain.controller.js
-│   └── location.controller.js
-├── database/
-│   └── db.js
-├── middleware/
-│   ├── auth.middleware.js
-├── models/
-│   ├── user.model.js
-│   └── captain.model.js
-├── routes/
-│   ├── user.routes.js
-│   ├── captain.routes.js
-│   └── location.routes.js
-├── services/
-│   ├── hashPassword.js
-│   ├── JWToken.js
-│   └── comparePassword.js
-├── .env
-├── package.json
-└── server.js
+// Registration acknowledgment
+socket.on('registrationAcknowledged', (data) => {
+  console.log('Registration acknowledged:', data);
+});
 ```
 
-## How It Works
+#### Captain Location Updates
+```javascript
+// Update captain location
+socket.emit('updateCaptainLocation', {
+  captainId: "67892ba437902adc7e3d260d",
+  location: {
+    lat: 40.7135,
+    lng: -74.0070
+  }
+});
+```
 
-1. Request Handling:
-   - Incoming requests are routed to appropriate controllers
-   - Middleware validates inputs and authenticates tokens
-   - Controllers process requests and interact with database
+#### Ride Requests
+```javascript
+// User requesting a ride
+socket.emit('requestRide', {
+  userId: "67892ba437902adc7e3d260c",
+  pickupLocation: {
+    lat: 40.7128,
+    lng: -74.0060,
+    address: "Times Square, New York, NY"
+  },
+  dropoffLocation: {
+    lat: 40.7580,
+    lng: -73.9855,
+    address: "Central Park, New York, NY"
+  },
+  rideType: "car",
+  price: 25.50,
+  distance: 3.2,
+  estimatedTime: 15
+}, (response) => {
+  console.log('Ride request response:', response);
+});
 
-2. Authentication Flow:
-   - User/Captain submits credentials
-   - Server validates input
-   - On success, JWT token is generated
-   - Token is required for protected routes
+// Captain receiving ride request
+socket.on('newRideRequest', (data) => {
+  console.log('New ride request:', data);
+  // data contains rideId, userId, pickup/dropoff locations, price, etc.
+});
 
-3. Location Services:
-   - Integrates with OpenStreetMap API
-   - Provides location suggestions and coordinates
-   - Supports map visualization with React Leaflet
-   
-4. Real-time Communication:
-   - Socket.io is used to establish real-time communication between users and drivers
-   - Enables instant updates and notifications for ride requests, status, and location sharing
+// User notified when captain is found
+socket.on('captainFound', (data) => {
+  console.log('Captain found:', data);
+  // data contains captainId, estimatedArrival time
+});
 
-## License
+// User notified when no captains are available
+socket.on('noCaptainsAvailable', (data) => {
+  console.log('No captains available for ride:', data.rideId);
+});
+```
 
-This project is licensed under the MIT License. See the LICENSE file for details.
+#### Ride Management
+```javascript
+// Captain accepting a ride
+socket.emit('acceptRide', {
+  rideId: "ride-123456",
+  captainId: "67892ba437902adc7e3d260d",
+  captainLocation: {
+    lat: 40.7135,
+    lng: -74.0070
+  },
+  estimatedArrival: 5 // minutes
+});
+
+// Captain rejecting a ride
+socket.emit('rejectRide', {
+  rideId: "ride-123456",
+  captainId: "67892ba437902adc7e3d260d",
+  reason: "Too far away"
+});
+
+// Cancelling a ride (by either user or captain)
+socket.emit('cancelRide', {
+  rideId: "ride-123456",
+  userId: "67892ba437902adc7e3d260c",
+  captainId: "67892ba437902adc7e3d260d",
+  cancelledBy: "user", // or "captain"
+  reason: "Changed plans"
+});
+
+// Ride cancellation notification
+socket.on('rideCancelled', (data) => {
+  console.log('Ride cancelled:', data);
+  // data contains rideId, cancelledBy, reason, etc.
+});
+```
+
+## Code Samples
+
+### Captain Registration in CaptainHome.jsx
+```jsx
+useEffect(() => {
+  if (!socket || !captainId || !driverLocation) return;
+
+  const registerCaptain = () => {
+    registerCaptainEmitter(socket, {
+      captainId,
+      location: driverLocation,
+      isActive: isDriverOnline
+    });
+  };
+
+  // Register initially
+  registerCaptain();
+
+  // Re-register periodically to maintain connection
+  const intervalId = setInterval(registerCaptain, 30000);
+
+  return () => {
+    clearInterval(intervalId);
+  };
+}, [socket, captainId, driverLocation, isDriverOnline]);
+```
+
+### Ride Request Handling in Server.js
+```javascript
+socket.on('requestRide', async (data, callback) => {
+  console.log(`Ride request received:`, data);
+  
+  // Basic validation
+  if (!data || !data.userId || !data.pickupLocation || !data.dropoffLocation) {
+    console.log('Invalid ride request data:', data);
+    if (callback) {
+      callback({ status: 'error', message: 'Missing required ride information' });
+    }
+    return;
+  }
+
+  try {
+    // Generate a unique ride ID
+    const rideId = generateRideId();
+    
+    // Store the ride request in pending requests
+    pendingRideRequests[rideId] = {
+      rideId,
+      userId: data.userId,
+      pickupLocation: data.pickupLocation,
+      dropoffLocation: data.dropoffLocation,
+      price: data.price,
+      distance: data.distance,
+      rideType: data.rideType,
+      status: 'pending',
+      requestTime: Date.now()
+    };
+    
+    // Acknowledge receipt of the request
+    if (callback) {
+      callback({ status: 'received', rideId });
+    }
+    
+    // Find nearby captains and match the ride...
+  } catch (error) {
+    console.error('Error processing ride request:', error);
+    if (callback) {
+      callback({ status: 'error', message: 'Server error processing request' });
+    }
+  }
+});
+```
+
+### Ride Notification UI in CaptainHome.jsx
+```jsx
+{showRideModal && incomingRide && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+      <h2 className="text-xl font-bold mb-4">New Ride Request</h2>
+      
+      {/* Rider details */}
+      <div className="mb-4">
+        <h3 className="font-semibold">Rider Details:</h3>
+        <p>{riderDetails?.name || 'Customer'}</p>
+        <p>{riderDetails?.phoneNumber || ''}</p>
+        <div className="flex items-center mt-1">
+          <div className="text-yellow-500 mr-1">★</div>
+          <span>{riderDetails?.rating || '4.5'}</span>
+        </div>
+      </div>
+      
+      {/* Trip details */}
+      <div className="mb-4">
+        <h3 className="font-semibold">Trip Details:</h3>
+        <div className="flex items-start mt-2">
+          <div className="min-w-[24px] mr-2">
+            <div className="w-3 h-3 rounded-full bg-green-500 mx-auto"></div>
+            <div className="w-0.5 h-10 bg-gray-300 mx-auto"></div>
+            <div className="w-3 h-3 rounded-full bg-red-500 mx-auto"></div>
+          </div>
+          <div className="flex-1">
+            <p className="text-sm mb-2 line-clamp-1">
+              {incomingRide.pickupLocation.address || 'Pickup location'}
+            </p>
+            <p className="text-sm line-clamp-1">
+              {incomingRide.dropoffLocation.address || 'Dropoff location'}
+            </p>
+          </div>
+        </div>
+      </div>
+      
+      {/* Action buttons */}
+      <div className="flex justify-between">
+        <button
+          onClick={handleRejectRide}
+          className="px-4 py-2 bg-gray-500 text-white rounded-lg w-[48%]"
+        >
+          Reject
+        </button>
+        <button
+          onClick={handleAcceptRide}
+          className="px-4 py-2 bg-blue-500 text-white rounded-lg w-[48%]"
+        >
+          Accept
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+```
 
 ## Recent Updates
 
-### 1. Price Calculation Enhancement
-- Added time-based pricing along with distance-based calculation
-- Implemented more realistic city speed calculations
-- Added per-minute pricing tiers
-```javascript
-const PRICING_TIERS = {
-  car: {
-    basePrice: 30,
-    pricePerKm: 2,
-    pricePerMin: 1, // NEW: Time-based pricing
-    name: "Uber X",
-    maxPassengers: 4
-  }
-  // ... other vehicle types
-};
-```
+### Captain Socket Connection & Ride Management (April 2025)
 
-### 2. Ride Selection Implementation
-- Added selectable ride options with visual feedback
-- Implemented booking state management
-```javascript
-const [selectedRide, setSelectedRide] = useState(null);
-const [bookingState, setBookingState] = useState('INITIAL'); // INITIAL, SEARCHING, DRIVER_FOUND
-```
+This update implements a comprehensive captain socket connection and ride management system:
 
-### 3. Real-time Driver Matching
-- Integrated Socket.IO for real-time communication
-- Added driver matching system
-- Implemented driver location updates
-```javascript
-// Socket event handling
-socket.emit('new_ride_request', {
-  rideType: selectedRide,
-  pickup: pickupLocation,
-  dropoff: dropoffLocation,
-  price: prices[selectedRide],
-  estimatedTime
-});
+- **Real-time Captain Connectivity**:
+  - Implemented reliable socket connection for captains with auto-reconnection
+  - Added periodic re-registration to maintain stable connections
+  - Enhanced location tracking and status management
 
-socket.on('driver_found', (driver) => {
-  setDriverDetails(driver);
-  setBookingState('DRIVER_FOUND');
-});
-```
+- **Ride Request System**:
+  - Created complete ride request flow from users to captains
+  - Implemented ride matching algorithm based on distance and availability
+  - Added ride acceptance, rejection, and cancellation functionality
 
-### 4. Driver Details Panel
-- Added comprehensive driver information display
-- Implemented communication options (call/message)
-- Added ride cancellation functionality
-```jsx
-const DriverDetailsPanel = ({ driver }) => (
-  <div className="fixed inset-0 bg-white z-50 p-4">
-    <div className="flex items-center gap-4">
-      <img src={driver.photo} className="w-16 h-16 rounded-full" />
-      <div>
-        <h3 className="text-xl font-semibold">{driver.name}</h3>
-        <div className="flex items-center gap-1">
-          <i className="ri-star-fill text-yellow-400"></i>
-          <span>{driver.rating}</span>
-        </div>
-      </div>
-    </div>
-    // ... vehicle details and action buttons
-  </div>
-);
-```
+- **Notification System**:
+  - Added real-time notifications for captains when new ride requests are received
+  - Implemented browser notifications using the Web Notifications API
+  - Created UI components to display ride details and status
 
-### 5. Loading States and UI Improvements
-- Added loading states for price calculation
-- Improved UI feedback during driver search
-- Enhanced ride selection visual feedback
-```jsx
-{bookingState === 'INITIAL' && 'Book a ride'}
-{bookingState === 'SEARCHING' && 'Finding your driver...'}
-{bookingState === 'DRIVER_FOUND' && 'Driver is on the way'}
-```
+- **Authentication Improvements**:
+  - Fixed JWT token handling to support both new and legacy formats
+  - Added public API endpoints for user and captain profile data
+  - Enhanced error handling and validation throughout the application
 
-### 6. Dependencies Added
-- Socket.IO Client for real-time communication
-```bash
-npm install socket.io-client
-```
+- **Map Integration**:
+  - Fixed map display in the CaptainHome component
+  - Improved location tracking and display for captains
+  - Enhanced distance calculation for captain-rider matching
 
-### 7. Example Response Format for Driver Match
-```javascript
-// Example driver details received from server
-{
-  name: "John Doe",
-  photo: "driver-photo-url.jpg",
-  rating: 4.8,
-  vehicle: {
-    model: "Toyota Camry",
-    color: "Silver",
-    number: "KA 01 AB 1234"
-  },
-  currentLocation: {
-    lat: 12.9716,
-    lon: 77.5946
-  }
-}
-```
-
-### Next Steps
-- Implement chat functionality between driver and rider
-- Add ride sharing options
-- Implement payment integration
-- Add ride history tracking
-- Enhance real-time location tracking accuracy
-
-### Known Issues
-- Socket connection needs error handling improvement
-- Location updates might be delayed in certain conditions
-- Need to implement timeout for driver search
+These updates significantly enhance the real-time communication between riders and captains, creating a more robust and user-friendly experience for both parties.
