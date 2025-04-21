@@ -6,10 +6,16 @@ import { useToast } from '../../context/ToastContext';
 import { FiEdit, FiLogOut, FiUser, FiTruck, FiCheckCircle, FiXCircle, FiArrowLeft } from 'react-icons/fi'; // Import FiArrowLeft
 
 const CaptainProfile = () => {
+  const navigate = useNavigate();
   const { captainId: contextCaptainId, logout: contextLogout } = useUserContext();
   const { captainId: paramsCaptainId } = useParams();
   const { showToast } = useToast();
-  const captainId = contextCaptainId || paramsCaptainId;
+
+  // Prioritize getting captainId from multiple sources
+  const captainId = contextCaptainId || 
+                    paramsCaptainId || 
+                    localStorage.getItem('captainId') || 
+                    null;
 
   const [profile, setProfile] = useState({
     name: '',
@@ -34,39 +40,83 @@ const CaptainProfile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedProfile, setEditedProfile] = useState({});
 
+  const [isLoading, setIsLoading] = useState(true);
+
   useEffect(() => {
     const fetchProfile = async () => {
       try {
+        // Reset loading state
+        setIsLoading(true);
+
+        // Get token from localStorage
         const token = localStorage.getItem('token');
-        if (!captainId || !token) {
-            console.error("Captain ID or token missing");
-            showToast('Could not load profile. Please log in again.', 'error');
-            // Optional: redirect to login
-            return;
+
+        // Comprehensive ID and token validation
+        if (!captainId) {
+          showToast('No captain ID found. Please log in again.', 'error');
+          navigate('/captain/login');
+          return;
         }
-        const response = await axios.get(`${import.meta.env.VITE_BASE_URL}/api/captain/${captainId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`
+
+        if (!token) {
+          showToast('Authentication token missing. Please log in again.', 'error');
+          navigate('/captain/login');
+          return;
+        }
+
+        // Fetch profile with comprehensive error handling
+        const response = await axios.get(
+          `${import.meta.env.VITE_BASE_URL}/api/captain/${captainId}`, 
+          {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
           }
-        });
+        );
+
         // Ensure nested objects exist before setting state
         const fetchedData = response.data.data || {};
         const initialProfile = {
-            ...profile, // Keep existing defaults
-            ...fetchedData,
-            vehicle: fetchedData.vehicle || profile.vehicle,
-            drivingLicense: fetchedData.drivingLicense || profile.drivingLicense,
+          ...profile,
+          ...fetchedData,
+          vehicle: fetchedData.vehicle || profile.vehicle,
+          drivingLicense: fetchedData.drivingLicense || profile.drivingLicense,
         };
+
         setProfile(initialProfile);
         setEditedProfile(initialProfile);
       } catch (error) {
-        console.error('Error fetching profile:', error);
-        showToast('Failed to fetch profile.', 'error');
+        console.error('Profile fetch error:', error);
+        
+        // Detailed error handling
+        if (error.response) {
+          switch (error.response.status) {
+            case 401:
+              showToast('Unauthorized. Please log in again.', 'error');
+              navigate('/captain/login');
+              break;
+            case 404:
+              showToast('Captain profile not found.', 'error');
+              break;
+            default:
+              showToast('Failed to load profile. Please try again.', 'error');
+          }
+        } else {
+          showToast('Network error. Please check your connection.', 'error');
+        }
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    fetchProfile();
-  }, [captainId]); // Removed profile from dependency array to avoid loop
+    // Only fetch if we have a captainId
+    if (captainId) {
+      fetchProfile();
+    } else {
+      // If no captainId, redirect to login
+      navigate('/captain/login');
+    }
+  }, [captainId, navigate, showToast]); // Added dependencies
 
 
 
@@ -132,8 +182,7 @@ const CaptainProfile = () => {
     // No need to navigate here if UserContext handles it
   };
 
-  const navigate = useNavigate();
-    // Define go back function
+  // Define go back function
     const handleGoBack = () => {
       navigate(-1); // Navigate to the previous page in history
     };
@@ -144,8 +193,15 @@ const CaptainProfile = () => {
   if (!captainId) {
     return <div className="min-h-screen flex items-center justify-center bg-gray-100 text-red-600">Error: Captain ID not found. Please log in.</div>;
   }
-  if (!profile.email && captainId) { // Check if profile is still loading
-    return <div className="min-h-screen flex items-center justify-center bg-gray-100">Loading profile...</div>;
+  if (isLoading) { // Use the isLoading state for more comprehensive loading check
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading profile...</p>
+        </div>
+      </div>
+    );
   }
 
   // Helper function to format date (optional, adjust as needed)

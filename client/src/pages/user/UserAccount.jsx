@@ -10,6 +10,11 @@ const UserAccount = () => {
   const [profileData, setProfileData] = React.useState(null);
   const [error, setError] = React.useState(null);
 
+  const handleLogout = () => {
+    logout();
+    navigate("/user-login");
+  };
+
   React.useEffect(() => {
     const fetchData = async () => {
       try {
@@ -17,6 +22,9 @@ const UserAccount = () => {
         if (!token) {
           throw new Error("No authentication token found");
         }
+        
+        console.log("Fetching user account with token:", token);
+        
         const response = await fetch(
           `${import.meta.env.VITE_BASE_URL}/api/user/account`,
           {
@@ -27,35 +35,49 @@ const UserAccount = () => {
             },
           }
         );
+        
+        console.log("Response status:", response.status);
+        
         if (!response.ok) {
           if (response.status === 401) {
-            logout();
-            navigate("/user-login");
-            throw new Error("Session expired. Please login again.");
+            setError("Session expired. Please login again.");
+            // Add a button to allow manual logout
+            return;
           }
           throw new Error("Failed to fetch account data");
         }
+        
         const data = await response.json();
-        setProfileData(data);
+        console.log("Account data received:", data);
+        setProfileData(data.data);
       } catch (error) {
         console.error("There was a problem with the fetch operation:", error);
         setError(error.message);
       }
     };
     fetchData();
-  }, [logout, navigate]);
+  }, []);
 
   if (error) {
     return (
       <div className="w-screen h-screen p-4 bg-gray-100">
         <div className="text-center mt-8">
           <p className="text-red-500 mb-4">{error}</p>
-          <button 
-            onClick={() => navigate("/user-login")}
-            className="bg-blue-500 text-white px-4 py-2 rounded"
-          >
-            Return to Login
-          </button>
+          {error === "Session expired. Please login again." ? (
+            <button 
+              onClick={handleLogout}
+              className="bg-blue-500 text-white px-4 py-2 rounded"
+            >
+              Logout
+            </button>
+          ) : (
+            <button 
+              onClick={() => navigate("/user-login")}
+              className="bg-blue-500 text-white px-4 py-2 rounded"
+            >
+              Return to Login
+            </button>
+          )}
         </div>
       </div>
     );
@@ -64,11 +86,6 @@ const UserAccount = () => {
   if (!profileData) {
     return <Loader />;
   }
-
-  const handleLogout = () => {
-    logout();
-    navigate("/user-login");
-  };
 
   return (
     <div className="min-h-screen bg-gray-100">

@@ -64,12 +64,12 @@ const LivePosition = ({ location, onMapReady }) => {
   const initialCenter = isValidLocation ? [location.lat, location.lon] : [0, 0]; // Default center if location is invalid
 
   return (
-    <div>
+    <div className="h-full w-full">
       {isValidLocation ? ( // Use isValidLocation check
         <MapContainer
           center={initialCenter}
           zoom={15}
-          style={{ height: "100vh", width: "100%", zIndex: "1" }}
+          style={{ height: "calc(100vh - 130px)", width: "100%", zIndex: "1" }}
           whenCreated={onMapReady ? setMap : undefined} // Pass setMap only if onMapReady is provided
           scrollWheelZoom={true}
         >

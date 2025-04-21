@@ -46,7 +46,7 @@ const ChooseRidePanel = ({
       return; // Don't set up listeners if socket is not ready
     }
 
-    console.log("ChooseRidePanel: Setting up socket listeners.");
+    // console.log("ChooseRidePanel: Setting up socket listeners.");
 
     const handleRideAccepted = (data) => {
       console.log("Ride Accepted:", data);
@@ -82,7 +82,38 @@ const ChooseRidePanel = ({
       }
     };
 
-    // Optional: Listen for location updates *after* ride is accepted
+    const handleCaptainAssigned = (data) => {
+      console.log("Captain Assigned:", data);
+      if (data.rideId) {
+        setCurrentRideId(data.rideId);
+        setBookingState("SEARCHING");
+        setErrorMessage("Captain assigned but not yet connected. Please wait.");
+      }
+    };
+
+    const handleCaptainFound = (data) => {
+      console.log("Captain Found:", data);
+      if (data.rideId && data.captainId) {
+        setCurrentRideId(data.rideId);
+        setBookingState("ACCEPTED");
+        // Fetch captain details using the public endpoint
+        fetch(`${import.meta.env.VITE_BASE_URL}/api/captain/${data.captainId}/public`)
+        .then(res => res.json())
+        .then(response => {
+          if (response.success) {
+            setCaptainDetails({
+              id: data.captainId,
+              ...response.data,
+              estimatedArrival: data.estimatedArrival || 5
+            });
+          }
+        })
+        .catch(err => {
+          console.error("Error fetching captain details:", err);
+        });
+      }
+    };
+
     const handleCaptainLocationUpdate = (data) => {
       // Only process if a ride is accepted and the update is for our captain
       if (
@@ -98,6 +129,8 @@ const ChooseRidePanel = ({
     socket.on("rideAccepted", handleRideAccepted);
     socket.on("rideRejected", handleRideRejected); // Assuming server sends this
     socket.on("noCaptainsAvailable", handleNoCaptainsAvailable); // Assuming server sends this
+    socket.on("captainAssigned", handleCaptainAssigned);
+    socket.on("captainFound", handleCaptainFound);
     socket.on("captainLocationUpdate", handleCaptainLocationUpdate);
 
     // Cleanup listeners on component unmount or socket change
@@ -106,6 +139,8 @@ const ChooseRidePanel = ({
       socket.off("rideAccepted", handleRideAccepted);
       socket.off("rideRejected", handleRideRejected);
       socket.off("noCaptainsAvailable", handleNoCaptainsAvailable);
+      socket.off("captainAssigned", handleCaptainAssigned);
+      socket.off("captainFound", handleCaptainFound);
       socket.off("captainLocationUpdate", handleCaptainLocationUpdate);
     };
     // Rerun this effect if the socket instance changes
@@ -132,18 +167,26 @@ const ChooseRidePanel = ({
     if (
       !selectedRide ||
       !userId ||
-      !socket ||
       !pickupData ||
       !dropoffData
     ) {
-      console.error("Cannot book ride: Missing information", {
+      console.error("Cannot book ride: Missing required ride information", {
         selectedRide,
         userId,
-        socket: !!socket,
         pickupData,
         dropoffData,
       });
-      setErrorMessage("Could not request ride. Please try again.");
+      setErrorMessage("Could not request ride. Please check all fields are filled.");
+      return;
+    }
+
+    // Check socket connection
+    if (!socket) {
+      console.error("Socket not connected. Attempting to reconnect...");
+      // Try to reconnect or inform the user
+      setErrorMessage("Connection issue. Please wait a moment and try again.");
+      
+      // Wait a moment and try again if the user retries
       return;
     }
 
@@ -154,12 +197,20 @@ const ChooseRidePanel = ({
 
       const rideDetails = {
         userId: userId,
-        pickupLocation: pickupData,
-        dropoffLocation: dropoffData,
+        pickupLocation: {
+          lat: pickupData.lat,
+          lng: pickupData.lng,
+          address: pickupData.address || "Selected pickup location"
+        },
+        dropoffLocation: {
+          lat: dropoffData.lat,
+          lng: dropoffData.lng,
+          address: dropoffData.address || "Selected destination"
+        },
         rideType: selectedRide,
         price: prices[selectedRide],
+        distance: distance,
         estimatedTime: estimatedTime,
-        // Add any other relevant details
       };
 
       console.log("Emitting 'requestRide':", rideDetails);

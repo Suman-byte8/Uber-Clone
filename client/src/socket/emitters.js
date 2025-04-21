@@ -21,7 +21,7 @@ export const updateLocation = (socket, locationData) => {
     socket.emit('updateLocation', locationData);
     return true;
   }
-  console.warn('Socket not connected. Location update not sent.');
+  console.warn('Socket not connected. Location update not sent.', locationData);
   return false;
 };
 
@@ -72,6 +72,50 @@ export const acceptRide = (socket, acceptData) => {
 };
 
 /**
+ * Reject a ride request (for captains)
+ * @param {Object} socket - The socket instance to use
+ * @param {Object} rejectData - The ride rejection data
+ * @param {string} rejectData.rideId - ID of the ride being rejected
+ * @param {string} rejectData.captainId - ID of the captain rejecting the ride
+ * @param {string} rejectData.reason - Optional reason for rejection
+ * @returns {boolean} - True if the event was emitted, false otherwise
+ */
+export const rejectRide = (socket, rejectData) => {
+  if (socket && socket.connected) {
+    socket.emit('rejectRide', {
+      ...rejectData,
+      rejectTime: new Date().toISOString()
+    });
+    return true;
+  }
+  console.warn('Socket not connected. Ride rejection not sent.');
+  return false;
+};
+
+/**
+ * Cancel an ongoing ride (for both users and captains)
+ * @param {Object} socket - The socket instance to use
+ * @param {Object} cancelData - The ride cancellation data
+ * @param {string} cancelData.rideId - ID of the ride being cancelled
+ * @param {string} cancelData.userId - ID of the user who booked the ride
+ * @param {string} cancelData.captainId - ID of the captain assigned to the ride
+ * @param {string} cancelData.cancelledBy - Who cancelled the ride ('user' or 'captain')
+ * @param {string} cancelData.reason - Optional reason for cancellation
+ * @returns {boolean} - True if the event was emitted, false otherwise
+ */
+export const cancelRide = (socket, cancelData) => {
+  if (socket && socket.connected) {
+    socket.emit('cancelRide', {
+      ...cancelData,
+      cancelTime: new Date().toISOString()
+    });
+    return true;
+  }
+  console.warn('Socket not connected. Ride cancellation not sent.');
+  return false;
+};
+
+/**
  * Join a specific room (for private communications)
  * @param {Object} socket - The socket instance to use
  * @param {string} roomId - The room ID to join
@@ -98,5 +142,44 @@ export const leaveRoom = (socket, roomId) => {
     return true;
   }
   console.warn('Socket not connected. Could not leave room.');
+  return false;
+};
+
+/**
+ * Register a captain with the socket server
+ * @param {Object} socket - The socket instance to use
+ * @param {Object} captainData - The captain registration data
+ * @param {string} captainData.captainId - ID of the captain
+ * @param {Object} captainData.location - Current location of the captain {lat, lng}
+ * @param {boolean} captainData.isActive - Whether the captain is active/online
+ * @returns {boolean} - True if the event was emitted, false otherwise
+ */
+export const registerCaptain = (socket, captainData) => {
+  if (socket && socket.connected) {
+    console.log('Registering captain with socket server:', captainData);
+    socket.emit('registerCaptain', {
+      ...captainData,
+      registrationTime: new Date().toISOString()
+    });
+    return true;
+  }
+  console.warn('Socket not connected. Captain registration not sent.');
+  return false;
+};
+
+/**
+ * Update captain's location
+ * @param {Object} socket - The socket instance to use
+ * @param {Object} locationData - The location data to send
+ * @param {string} locationData.captainId - ID of the captain
+ * @param {Object} locationData.location - Current location {lat, lng}
+ * @returns {boolean} - True if the event was emitted, false otherwise
+ */
+export const updateCaptainLocation = (socket, locationData) => {
+  if (socket && socket.connected) {
+    socket.emit('updateCaptainLocation', locationData);
+    return true;
+  }
+  console.warn('Socket not connected. Captain location update not sent.');
   return false;
 };

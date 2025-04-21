@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const { check, validationResult } = require('express-validator');
-const { signup, login, getAccountDetails } = require('../controllers/user.controller');
+const { signup, login, getAccountDetails, getPublicUserDetails } = require('../controllers/user.controller');
 const { protect } = require('../middlewares/authMiddleWare');
 
-
+// Public routes
 router.post('/signup', [
     // Validation middleware
     check('name')
@@ -71,9 +71,9 @@ router.post('/login', [
     login(req, res);
 });
 
-// Route for fetching user account details
+router.get('/:userId/public', getPublicUserDetails);
+
+// Protected routes
 router.get('/account', protect, getAccountDetails);
-
-
 
 module.exports = router

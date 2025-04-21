@@ -122,7 +122,12 @@ const loginCaptain = async (req, res) => {
 const getCaptainDetails = async (req, res) => {
   try {
     const captainId = req.params.captainId;
-
+    if (!captainId || captainId === 'undefined') {
+      return res.status(400).json({
+        success: false,
+        message: 'Captain ID is required and must be valid.'
+      });
+    }
     // Find captain by ID and exclude sensitive information
     const captain = await Captain.findById(captainId)
       .select('-password -__v')
@@ -141,10 +146,9 @@ const getCaptainDetails = async (req, res) => {
       data: captain
     });
   } catch (error) {
-    console.error('Error in getCaptainDetails:', error);
     res.status(500).json({
       success: false,
-      message: 'Internal server error',
+      message: 'Server error',
       error: error.message
     });
   }

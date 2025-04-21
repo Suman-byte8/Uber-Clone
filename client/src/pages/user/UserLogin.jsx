@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useUserContext } from "../../context/UserContext";
 
 const UserLogin = () => {
-    const { login } = useUserContext(); // Change this line to get login function
+    const { login } = useUserContext(); 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -21,10 +21,22 @@ const UserLogin = () => {
                 password
             });
 
-            setSuccess('Login successful!');
-            const userId = response.data._id;
-            login(response.data.token, userId, 'user'); // Use the login function instead
-            navigate('/user-home');
+            if (response.data && response.data.success) {
+                setSuccess('Login successful!');
+                // Extract user ID and token from the response
+                const userId = response.data.user.id;
+                const token = response.data.token;
+                
+                // First update the context
+                login(token, userId, 'user');
+                
+                // Wait a moment for state to update before navigating
+                setTimeout(() => {
+                    navigate('/user-home');
+                }, 100);
+            } else {
+                setError('Login failed. Please try again.');
+            }
         } catch (error) {
             console.error('Error logging in:', error);
             setError('Invalid email or password. Please try again.');
@@ -57,8 +69,8 @@ const UserLogin = () => {
                     />
                 </div>
 
-                {error && <p className="text-red-500">{error}</p>} {/* Display error message */}
-                {success && <p className="text-green-500">{success}</p>} {/* Display success message */}
+                {error && <p className="text-red-500">{error}</p>} 
+                {success && <p className="text-green-500">{success}</p>} 
 
                 <button 
                     type="submit"

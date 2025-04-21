@@ -16,10 +16,21 @@ const protect = async (req, res, next) => {
 
             // Get user based on role
             let user;
-            if (decoded.role === 'captain') {
-                user = await Captain.findById(decoded.id).select('-password');
+            if (decoded.user && decoded.user.role === 'captain') {
+                user = await Captain.findById(decoded.user.id).select('-password');
+                user.role = 'captain'; // Ensure role is set
+            } else if (decoded.user) {
+                user = await User.findById(decoded.user.id).select('-password');
+                user.role = 'user'; // Ensure role is set
             } else {
-                user = await User.findById(decoded.id).select('-password');
+                // Legacy token format
+                if (decoded.role === 'captain') {
+                    user = await Captain.findById(decoded.id).select('-password');
+                    user.role = 'captain';
+                } else {
+                    user = await User.findById(decoded.id).select('-password');
+                    user.role = 'user';
+                }
             }
 
             if (!user) {
@@ -58,4 +69,3 @@ const generateToken = (id, role) => {
 };
 
 module.exports = { protect, authorize, generateToken };
-

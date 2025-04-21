@@ -40,8 +40,11 @@ router.post('/login', [
 // Update captain location route
 router.put('/:captainId/location', protect, authorize('captain'), updateLocation);
 
-// Get captain details route
+// Get captain details route (protected - only for captains)
 router.get('/:captainId', protect, authorize('captain'), getCaptainDetails);
+
+// Public route to get basic captain details for ride matching
+router.get('/:captainId/public', getCaptainDetails);
 
 // Update captain details route with validation
 router.put('/:captainId', [

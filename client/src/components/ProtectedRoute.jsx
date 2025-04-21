@@ -6,16 +6,16 @@ const ProtectedRoute = ({ children, requiredRole }) => {
   const { isAuthenticated, userId, captainId } = useUserContext();
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to={requiredRole === 'captain' ? "/captain-login" : "/user-login"} replace />;
   }
 
   // Check if the user has the required role
   if (requiredRole === 'user' && !userId) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/user-login" replace />;
   }
 
   if (requiredRole === 'captain' && !captainId) {
-    return <Navigate to="/captain/login" replace />;
+    return <Navigate to="/captain-login" replace />;
   }
 
   return children;
