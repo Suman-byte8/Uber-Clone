@@ -74,72 +74,47 @@ const haversineDistance = (loc1, loc2) => {
 // Add findNearbyRides function to match captains with pending ride requests
 const pendingRideRequests = {};
 
-function findNearbyRides(captainId, captainLocation) {
-  if (!captainId || !captainLocation || !captainLocation.lat || !captainLocation.lng) {
-    console.log('Invalid captain data for ride matching');
-    return;
-  }
+// Helper: Exclude captains who rejected a ride
+function getEligibleCaptainsForRide(rideData, connectedCaptains) {
+  return Object.entries(connectedCaptains).filter(([captainId, captainInfo]) => {
+    if (captainInfo.isInRide) return false;
+    if (rideData.rejectedBy && rideData.rejectedBy.includes(captainId)) return false;
+    if (!captainInfo.location || !captainInfo.socketId) return false;
+    return true;
+  });
+}
 
-  console.log(`Finding nearby rides for captain ${captainId} at location:`, captainLocation);
-  
-  // Skip if no pending ride requests
-  if (Object.keys(pendingRideRequests).length === 0) {
-    return;
-  }
+function findNearbyRides(captainId, captainLocation, specificRideId = null) {
+  // If called for retrying a specific ride, only process that ride
+  let ridesToCheck = specificRideId ? [[specificRideId, pendingRideRequests[specificRideId]]] : Object.entries(pendingRideRequests);
 
-  // Calculate distance to each pending ride
-  const captainMatches = [];
-  
-  for (const [rideId, rideData] of Object.entries(pendingRideRequests)) {
-    try {
-      const pickupLocation = rideData.pickupLocation;
-      
-      if (!pickupLocation || !pickupLocation.lat || !pickupLocation.lng) {
-        console.log(`Skipping ride ${rideId} due to invalid pickup location`);
-        continue;
+  for (const [rideId, rideData] of ridesToCheck) {
+    // Only consider rides not already assigned or waiting for response
+    if ((rideData.status === 'assigned' || rideData.status === 'pending_response') && rideData.captainId) continue;
+    if (!rideData.pickupLocation || !rideData.pickupLocation.lat || !rideData.pickupLocation.lng) continue;
+    // If retrying, exclude captains who already rejected
+    let eligibleCaptains = getEligibleCaptainsForRide(rideData, connectedCaptains);
+    // If specific captain is provided, filter for that one
+    if (captainId) {
+      eligibleCaptains = eligibleCaptains.filter(([id]) => id === captainId);
+    }
+    // Find closest eligible captain
+    let closest = null;
+    let minDist = Infinity;
+    eligibleCaptains.forEach(([id, info]) => {
+      const dist = haversineDistance(info.location, rideData.pickupLocation);
+      if (dist < minDist && dist <= 8) {
+        minDist = dist;
+        closest = { id, info, dist };
       }
-      
-      const distance = haversineDistance(captainLocation, pickupLocation);
-      console.log(`Distance from captain ${captainId} to ride ${rideId}: ${distance.toFixed(2)} km`);
-      
-      if (distance <= 8) { // 8 km radius
-        captainMatches.push({
-          rideId,
-          distance,
-          rideData
-        });
-      }
-    } catch (error) {
-      console.error(`Error calculating distance for ride ${rideId}:`, error);
-    }
-  }
-  
-  // Sort matches by distance (closest first)
-  captainMatches.sort((a, b) => a.distance - b.distance);
-  
-  // Try to match with the closest ride
-  if (captainMatches.length > 0) {
-    const closestMatch = captainMatches[0];
-    const { rideId, rideData } = closestMatch;
-    
-    console.log(`Matching captain ${captainId} with ride ${rideId} (${closestMatch.distance.toFixed(2)} km away)`);
-    
-    // Check if captain is already in a ride
-    const captainInfo = connectedCaptains[captainId];
-    if (captainInfo && captainInfo.isInRide) {
-      console.log(`Captain ${captainId} is already in a ride, skipping match`);
-      return;
-    }
-    
-    // Mark the captain as matched
-    if (connectedCaptains[captainId]) {
-      connectedCaptains[captainId].isInRide = true;
-    }
-    
-    // Emit ride request to captain
-    const captainSocketId = connectedCaptains[captainId]?.socketId;
-    if (captainSocketId) {
-      io.to(captainSocketId).emit('newRideRequest', {
+    });
+    if (closest) {
+      // Assign ride and set pending response
+      rideData.status = 'pending_response';
+      rideData.captainId = closest.id;
+      if (!rideData.rejectedBy) rideData.rejectedBy = [];
+      connectedCaptains[closest.id].isInRide = true;
+      io.to(closest.info.socketId).emit('newRideRequest', {
         rideId,
         userId: rideData.userId,
         pickupLocation: rideData.pickupLocation,
@@ -148,16 +123,21 @@ function findNearbyRides(captainId, captainLocation) {
         distance: rideData.distance,
         rideType: rideData.rideType
       });
-      
-      console.log(`Sent ride request to captain ${captainId} (socket: ${captainSocketId})`);
-      
-      // Remove from pending requests
-      delete pendingRideRequests[rideId];
-    } else {
-      console.log(`Captain ${captainId} is not connected via socket`);
+      console.log(`Sent ride request for ride ${rideId} to captain ${closest.id}`);
+      // Set timeout for response (e.g., 30 seconds)
+      if (rideData.responseTimeout) clearTimeout(rideData.responseTimeout);
+      rideData.responseTimeout = setTimeout(() => {
+        if (pendingRideRequests[rideId] && pendingRideRequests[rideId].status === 'pending_response') {
+          // Mark as rejected by this captain due to timeout
+          if (!rideData.rejectedBy.includes(closest.id)) rideData.rejectedBy.push(closest.id);
+          connectedCaptains[closest.id].isInRide = false;
+          rideData.status = 'unassigned';
+          rideData.captainId = null;
+          console.log(`Captain ${closest.id} did not respond in time for ride ${rideId}, retrying assignment.`);
+          findNearbyRides(null, null, rideId);
+        }
+      }, 30000); // 30 seconds
     }
-  } else {
-    console.log(`No matching rides found for captain ${captainId}`);
   }
 }
 
@@ -215,6 +195,25 @@ io.on('connection', (socket) => {
       
       // Acknowledge registration
       socket.emit('registrationAcknowledged', { success: true });
+      
+      // --- FIX: Only send pending rides not already assigned ---
+      Object.keys(pendingRideRequests).forEach(rideId => {
+        const ride = pendingRideRequests[rideId];
+        if (ride && ride.status !== 'assigned') {
+          socket.emit('newRideRequest', {
+            rideId,
+            userId: ride.userId,
+            pickupLocation: ride.pickupLocation,
+            dropoffLocation: ride.dropoffLocation,
+            price: ride.price,
+            distance: ride.distance,
+            rideType: ride.rideType
+          });
+          // Mark as assigned to this captain
+          pendingRideRequests[rideId].status = 'assigned';
+          pendingRideRequests[rideId].captainId = data.captainId;
+        }
+      });
       
       // Check for pending rides that might match this captain
       if (data.location) {
@@ -500,79 +499,113 @@ io.on('connection', (socket) => {
   });
 
   // --- Ride Lifecycle Events ---
-  socket.on('acceptRide', (data) => {
-    if (socket.role === 'captain') {
-      console.log(`Captain ${socket.userId} accepted ride ${data.rideId}`);
-
-      const ride = rides[data.rideId];
-      if (!ride) {
-        socket.emit('acceptRideResponse', { status: 'error', message: 'Ride not found' });
-        return;
+  socket.on('rejectRide', (data) => {
+    if (!data || !data.rideId || !data.captainId) return;
+    if (pendingRideRequests[data.rideId]) {
+      if (pendingRideRequests[data.rideId].responseTimeout) clearTimeout(pendingRideRequests[data.rideId].responseTimeout);
+      if (!pendingRideRequests[data.rideId].rejectedBy) pendingRideRequests[data.rideId].rejectedBy = [];
+      if (!pendingRideRequests[data.rideId].rejectedBy.includes(data.captainId)) {
+        pendingRideRequests[data.rideId].rejectedBy.push(data.captainId);
       }
-
-      if (ride.status !== 'requested') {
-        socket.emit('acceptRideResponse', { status: 'error', message: 'Ride already accepted or completed' });
-        return;
-      }
-
-      // Update ride status and assign captain
-      ride.status = 'accepted';
-      ride.captainId = socket.userId;
-
-      // Notify the user who requested the ride
-      const userSocketId = connectedUsers[ride.userId];
-      if (userSocketId) {
-        const captainDetails = {
-          id: socket.userId,
-          // Add more captain details as needed, e.g., name, vehicle, rating
-        };
-        io.to(userSocketId).emit('rideAccepted', { rideId: data.rideId, captainDetails });
-      }
-
-      // Optionally join ride room
-      socket.join(`ride_${data.rideId}`);
-
-      // Acknowledge to captain
-      socket.emit('acceptRideResponse', { status: 'success', rideId: data.rideId });
+      connectedCaptains[data.captainId].isInRide = false;
+      pendingRideRequests[data.rideId].status = 'unassigned';
+      pendingRideRequests[data.rideId].captainId = null;
+      // Try to find another captain for this ride
+      setTimeout(() => {
+        if (pendingRideRequests[data.rideId] && pendingRideRequests[data.rideId].status !== 'completed') {
+          findNearbyRides(null, null, data.rideId);
+        }
+      }, 1000);
     }
   });
 
-  socket.on('rejectRide', (data) => {
-    if (!data || !data.rideId || !data.captainId) {
-      console.log('Invalid ride rejection data:', data);
-      return;
-    }
-
-    console.log(`Captain ${data.captainId} rejected ride ${data.rideId}`);
-    
-    // Remove this captain from the potential matches for this ride
-    if (pendingRideRequests[data.rideId]) {
-      // Mark this captain as having rejected this ride
-      if (!pendingRideRequests[data.rideId].rejectedBy) {
-        pendingRideRequests[data.rideId].rejectedBy = [];
-      }
-      pendingRideRequests[data.rideId].rejectedBy.push(data.captainId);
+  socket.on('acceptRide', async (data) => {
+    if (socket.role === 'captain' && data && data.rideId && pendingRideRequests[data.rideId]) {
+      console.log(`Captain ${socket.userId} accepted ride ${data.rideId}`);
       
-      // Try to find another captain for this ride
-      if (pendingRideRequests[data.rideId].userId && connectedCaptains[data.captainId]) {
-        // Get the user's socket
-        const userSocketId = connectedUsers[pendingRideRequests[data.rideId].userId];
-        
-        if (userSocketId) {
-          // Inform the user that we're still looking for a captain
-          io.to(userSocketId).emit('captainSearching', {
-            rideId: data.rideId,
-            message: 'Looking for another captain...'
-          });
+      // Clear response timeout if exists
+      if (pendingRideRequests[data.rideId].responseTimeout) {
+        clearTimeout(pendingRideRequests[data.rideId].responseTimeout);
+      }
+      
+      // Mark ride as completed in the pending requests
+      pendingRideRequests[data.rideId].status = 'completed';
+      
+      try {
+        // Fetch detailed captain information from database
+        const captain = await Captain.findById(socket.userId);
+        if (!captain) {
+          console.error(`Captain ${socket.userId} not found in database`);
+          return;
         }
         
-        // Try to find another nearby captain
-        setTimeout(() => {
-          // Only search if the ride is still pending
-          if (pendingRideRequests[data.rideId]) {
-            findNearbyRides(null, pendingRideRequests[data.rideId].pickupLocation, data.rideId);
+        console.log("Captain from database:", JSON.stringify({
+          id: captain._id,
+          name: captain.name,
+          hasVehicle: !!captain.vehicle,
+          vehicleFields: captain.vehicle ? Object.keys(captain.vehicle) : []
+        }, null, 2));
+        
+        // Create detailed captain info object for the user
+        const captainDetails = {
+          id: captain._id,
+          name: captain.name,
+          phoneNumber: captain.phoneNumber,
+          rating: captain.rating || 4.5,
+          photo: captain.photo || '/default-captain.png',
+          vehicle: captain.vehicle ? {
+            make: captain.vehicle.make || 'Unknown',
+            model: captain.vehicle.model || 'Unknown',
+            color: captain.vehicle.color || 'Unknown',
+            year: captain.vehicle.year || new Date().getFullYear(),
+            licensePlate: captain.vehicle.licensePlate || 'ABC-1234' // Use licensePlate instead of number
+          } : {
+            make: 'Toyota',
+            model: 'Camry',
+            color: 'Blue',
+            year: 2022,
+            licensePlate: 'ABC-1234'
+          },
+          location: captain.currentLocation || data.captainLocation || null,
+          estimatedArrival: data.estimatedArrival || 5 // minutes
+        };
+        
+        console.log("Sending captain details to user:", JSON.stringify(captainDetails, null, 2));
+        console.log("Original vehicle data:", JSON.stringify(captain.vehicle, null, 2));
+        
+        // Notify the user who requested the ride
+        const userSocketId = connectedUsers[pendingRideRequests[data.rideId].userId];
+        if (userSocketId) {
+          io.to(userSocketId).emit('rideAccepted', { 
+            rideId: data.rideId, 
+            captainDetails 
+          });
+          console.log(`Notified user ${pendingRideRequests[data.rideId].userId} about accepted ride`);
+        }
+        
+        // Remove from pending requests after a short delay
+        setTimeout(() => { 
+          delete pendingRideRequests[data.rideId]; 
+        }, 2000);
+        
+        // Update captain status
+        connectedCaptains[socket.userId].isInRide = true;
+        
+        // Acknowledge to captain
+        socket.emit('acceptRideResponse', { 
+          status: 'success', 
+          rideId: data.rideId,
+          userDetails: {
+            id: pendingRideRequests[data.rideId].userId,
+            // Add more user details if available
           }
-        }, 1000);
+        });
+      } catch (error) {
+        console.error(`Error processing ride acceptance:`, error);
+        socket.emit('acceptRideResponse', { 
+          status: 'error', 
+          message: 'Failed to process ride acceptance' 
+        });
       }
     }
   });
@@ -669,6 +702,52 @@ app.use('/api/captain',captainRoutes)
 app.use('/api/otp', otpRoutes);
 
 app.use('/api/locations', locationRoutes);
+
+// Add a test route to create a captain with complete vehicle details
+app.post('/api/test/create-captain', async (req, res) => {
+  try {
+    // Create a test captain with complete vehicle details
+    const testCaptain = new Captain({
+      name: "Test Driver",
+      email: "testdriver@example.com",
+      phoneNumber: "+1234567890",
+      password: "password123", // In production, this would be hashed
+      drivingLicense: {
+        number: "DL12345678",
+        expiryDate: new Date('2025-12-31')
+      },
+      vehicle: {
+        make: "Toyota",
+        model: "Camry",
+        year: 2022,
+        color: "Blue",
+        licensePlate: "ABC-1234"
+      },
+      isVerified: true,
+      isActive: true,
+      rating: 4.8,
+      currentLocation: {
+        lat: 37.7749,
+        lon: -122.4194
+      }
+    });
+
+    await testCaptain.save();
+    
+    res.status(201).json({
+      success: true,
+      message: "Test captain created successfully",
+      captainId: testCaptain._id
+    });
+  } catch (error) {
+    console.error("Error creating test captain:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to create test captain",
+      error: error.message
+    });
+  }
+});
 
 server.listen(port, () => {
   console.log(`Server is running on port ${port}`);
