@@ -209,16 +209,30 @@ const CaptainHome = () => {
   useEffect(() => {
     if (!socket) return;
 
+    // Track ride requests we've already seen to prevent duplicates
+    const seenRideRequests = new Set();
+
     const handleNewRideRequest = (ride) => {
+      // Prevent duplicate ride requests
+      if (seenRideRequests.has(ride.rideId)) {
+        console.log("Ignoring duplicate ride request:", ride.rideId);
+        return;
+      }
+      
+      // Add to seen set
+      seenRideRequests.add(ride.rideId);
+      
       console.log("New ride request received:", ride);
       
-      // Show notification for new ride
+      // Show notification for new ride - DISABLED
+      /*
       if ('Notification' in window && Notification.permission === 'granted') {
         new Notification('New Ride Request', {
           body: `New ride request from ${ride.pickupLocation.address || 'a customer'}`,
           icon: '/notification-icon.png' // Add an icon to your public folder
         });
       }
+      */
       
       // Fetch rider details
       if (ride.userId) {
@@ -264,10 +278,12 @@ const CaptainHome = () => {
     socket.on('newRideRequest', handleNewRideRequest);
     socket.on('rideCancelled', handleRideCancelled);
 
-    // Request notification permission
+    // Request notification permission - DISABLED
+    /*
     if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
       Notification.requestPermission();
     }
+    */
 
     return () => {
       socket.off('newRideRequest', handleNewRideRequest);

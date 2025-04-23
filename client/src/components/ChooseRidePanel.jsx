@@ -49,7 +49,7 @@ const ChooseRidePanel = ({
     // console.log("ChooseRidePanel: Setting up socket listeners.");
 
     const handleRideAccepted = (data) => {
-      console.log("Ride Accepted:", data);
+      console.log("Ride Accepted with full details:", JSON.stringify(data));
       // Check if this acceptance is for the ride we requested
       if (data.rideId === currentRideId) {
         setCaptainDetails(data.captainDetails);
@@ -427,6 +427,12 @@ const DriverDetailsPanel = ({ driver, onCancel, onBack }) => (
           <i className="ri-star-fill text-yellow-400"></i>
           <span>{driver.rating?.toFixed(1) || "N/A"}</span>
         </div>
+        {driver.phoneNumber && (
+          <div className="text-sm text-gray-600 mt-1">
+            <i className="ri-phone-line mr-1"></i>
+            {driver.phoneNumber}
+          </div>
+        )}
       </div>
     </div>
 
@@ -435,12 +441,27 @@ const DriverDetailsPanel = ({ driver, onCancel, onBack }) => (
         <h4 className="font-medium text-gray-700 mb-2">Vehicle Details</h4>
         <div className="bg-gray-100 p-3 rounded-lg space-y-1 text-gray-800">
           <p>
-            <span className="font-semibold">{driver.vehicle.model}</span> (
-            {driver.vehicle.color})
+            <span className="font-semibold">
+              {driver.vehicle.make} {driver.vehicle.model}
+            </span> ({driver.vehicle.color})
           </p>
-          <p className="text-lg font-bold tracking-wider">
-            {driver.vehicle.number}
+          <p className="text-sm text-gray-600">
+            Year: {driver.vehicle.year}
           </p>
+          <p className="text-lg font-bold tracking-wider bg-yellow-50 p-2 rounded border border-yellow-200">
+            <span className="text-sm font-normal text-gray-600 mr-2">Number Plate:</span>
+            {driver.vehicle && driver.vehicle.licensePlate ? driver.vehicle.licensePlate : "Not available"}
+          </p>
+        </div>
+      </div>
+    )}
+
+    {driver.estimatedArrival && (
+      <div className="mb-4">
+        <h4 className="font-medium text-gray-700 mb-2">Estimated Arrival</h4>
+        <div className="bg-blue-50 p-3 rounded-lg text-blue-800 font-semibold">
+          <i className="ri-time-line mr-2"></i>
+          {driver.estimatedArrival} minutes
         </div>
       </div>
     )}
@@ -451,10 +472,16 @@ const DriverDetailsPanel = ({ driver, onCancel, onBack }) => (
     </div>
 
     <div className="flex gap-3 mt-auto mb-2">
-      <button className="flex-1 p-3 bg-gray-100 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-200">
+      <button 
+        onClick={() => window.location.href = `tel:${driver.phoneNumber}`}
+        className="flex-1 p-3 bg-gray-100 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-200"
+      >
         <i className="ri-phone-line"></i> Call
       </button>
-      <button className="flex-1 p-3 bg-gray-100 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-200">
+      <button 
+        onClick={() => window.location.href = `sms:${driver.phoneNumber}`}
+        className="flex-1 p-3 bg-gray-100 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-200"
+      >
         <i className="ri-message-2-line"></i> Message
       </button>
     </div>
