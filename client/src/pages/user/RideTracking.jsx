@@ -125,6 +125,23 @@ const RideTracking = () => {
       }
     };
     
+    // Handle no drivers found
+    const handleNoDriversFound = (data) => {
+      if (data.rideId === rideDetails.rideId) {
+        setRideStatus('NO_DRIVERS');
+        // Optionally show a toast or notification
+        if (Notification.permission === "granted") {
+          new Notification("No Drivers Found", {
+            body: "No drivers found nearby. Please try again later.",
+            icon: "/logo.png"
+          });
+        }
+        setTimeout(() => {
+          navigate('/user-home');
+        }, 3500);
+      }
+    };
+    
     // Register event listeners
     socket.on('captainLocationUpdate', handleCaptainLocationUpdate);
     socket.on('rideStatusUpdate', handleRideStatusUpdate);
@@ -132,6 +149,7 @@ const RideTracking = () => {
     socket.on('rideStarted', handleRideStarted);
     socket.on('rideCompleted', handleRideCompleted);
     socket.on('rideCancelled', handleRideCancelled);
+    socket.on('noDriversFound', handleNoDriversFound);
     
     // Cleanup event listeners
     return () => {
@@ -141,6 +159,7 @@ const RideTracking = () => {
       socket.off('rideStarted', handleRideStarted);
       socket.off('rideCompleted', handleRideCompleted);
       socket.off('rideCancelled', handleRideCancelled);
+      socket.off('noDriversFound', handleNoDriversFound);
     };
   }, [socket, rideDetails, captainDetails, navigate, rideStatus]);
   
@@ -173,6 +192,8 @@ const RideTracking = () => {
         return 'Ride completed';
       case 'RIDE_CANCELLED':
         return 'Ride cancelled';
+      case 'NO_DRIVERS':
+        return 'No drivers found nearby';
       default:
         return 'Finding your captain';
     }

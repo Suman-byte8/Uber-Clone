@@ -26,6 +26,9 @@ const CaptainHome = () => {
   const [showRideModal, setShowRideModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
+  const [showRejectedModal, setShowRejectedModal] = useState(false);
+  const [rejectedMessage, setRejectedMessage] = useState('');
+  const [showRiderProfile, setShowRiderProfile] = useState(false);
   const { captainId: contextCaptainId } = useUserContext();
   const captainId = localStorage.getItem("captainId") || contextCaptainId; // Use the ID from context if available;
   const token = localStorage.getItem("token");
@@ -275,8 +278,27 @@ const CaptainHome = () => {
       }
     };
 
+    const handleUserRejected = (data) => {
+      // Disconnect socket and show modal that user rejected
+      if (socket && socket.connected) {
+        socket.disconnect();
+      }
+      setCurrentRide(null);
+      setShowRejectedModal(true);
+      setRejectedMessage("User rejected the ride. Please wait for a new ride request.");
+    };
+
+    const handleRideRejected = (data) => {
+      setShowRejectedModal(true);
+      setRejectedMessage(data.message || 'Ride was rejected');
+      setCurrentRide(null);
+      setIncomingRide(null);
+    };
+
     socket.on('newRideRequest', handleNewRideRequest);
     socket.on('rideCancelled', handleRideCancelled);
+    socket.on('userRejected', handleUserRejected);
+    socket.on('rideRejected', handleRideRejected);
 
     // Request notification permission - DISABLED
     /*
@@ -288,11 +310,58 @@ const CaptainHome = () => {
     return () => {
       socket.off('newRideRequest', handleNewRideRequest);
       socket.off('rideCancelled', handleRideCancelled);
+      socket.off('userRejected', handleUserRejected);
+      socket.off('rideRejected', handleRideRejected);
     };
   }, [socket, showToast, currentRide, incomingRide]);
 
+  // --- Live Tracking: Listen for counterpartyLocation (user's location) ---
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleCounterpartyLocation = (data) => {
+      // Only process if this is for the current ride
+      if (currentRide && data.rideId === currentRide.rideId && data.role === 'user') {
+        setRiderDetails((prev) => ({ ...(prev || {}), liveLocation: { lat: data.lat, lng: data.lng } }));
+      }
+    };
+
+    socket.on('counterpartyLocation', handleCounterpartyLocation);
+    return () => {
+      socket.off('counterpartyLocation', handleCounterpartyLocation);
+    };
+  }, [socket, currentRide]);
+
+  useEffect(() => {
+    if (showRiderProfile) {
+      const timer = setTimeout(() => setShowRiderProfile(false), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [showRiderProfile]);
+
   const handleAcceptRide = () => {
     if (!incomingRide) return;
+    
+    console.log('Accepting ride:', incomingRide);
+    console.log('Current rider details:', riderDetails);
+    
+    // Ensure we have rider details before accepting
+    if (!riderDetails) {
+      fetch(`${import.meta.env.VITE_BASE_URL}/api/user/${incomingRide.userId}/public`)
+        .then(res => res.json())
+        .then(response => {
+          console.log('Fetched rider details:', response);
+          if (response.success) {
+            setRiderDetails({
+              id: incomingRide.userId,
+              ...response.data
+            });
+          }
+        })
+        .catch(err => {
+          console.error("Error fetching rider details:", err);
+        });
+    }
     
     acceptRide(socket, {
       rideId: incomingRide.rideId,
@@ -310,6 +379,8 @@ const CaptainHome = () => {
     // Close the modal
     setShowRideModal(false);
     setIncomingRide(null);
+    
+    setShowRiderProfile(true);
     
     showToast('Ride accepted successfully', 'success');
   };
@@ -584,6 +655,54 @@ const CaptainHome = () => {
                 Confirm Cancellation
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* User rejected modal */}
+      {showRejectedModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg max-w-md w-full">
+            <h3 className="text-xl font-bold mb-4">Ride Rejected</h3>
+            <p className="mb-4">{rejectedMessage}</p>
+            <button
+              className="w-full bg-black text-white py-2 rounded-lg"
+              onClick={() => setShowRejectedModal(false)}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Rider profile modal */}
+      {showRiderProfile && riderDetails && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          {console.log('Rendering rider profile modal:', riderDetails)}
+          <div className="bg-white rounded-lg shadow-lg p-6 w-[90vw] max-w-sm">
+            <h2 className="text-xl font-semibold mb-4 text-center">Rider Profile</h2>
+            <div className="flex flex-col items-center mb-4">
+              <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center text-2xl mb-2">
+                {riderDetails.name ? riderDetails.name.charAt(0).toUpperCase() : 'R'}
+              </div>
+              <p className="font-medium text-lg">{riderDetails.name || 'Rider'}</p>
+              <div className="flex items-center text-yellow-500 mt-1">
+                ★ <span className="ml-1">{riderDetails.rating || '4.5'}</span>
+              </div>
+              <div className="mt-2 text-center">
+                <p className="text-sm text-gray-600">
+                  {riderDetails.phoneNumber ? 
+                    `Phone: ${riderDetails.phoneNumber}` : 
+                    'Phone number not available'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowRiderProfile(false)}
+              className="w-full py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+            >
+              Close
+            </button>
           </div>
         </div>
       )}
