@@ -27,9 +27,11 @@ const RideTracking = () => {
   const socket = useSocket();
   const { userId } = useUserContext();
   const mapRef = useRef(null);
+  const { rideDetails } = location.state || {};
   
   // Get ride details from location state
-  const { captainDetails, rideDetails } = location.state || {};
+  const [hasCaptainAccepted, setHasCaptainAccepted] = useState(false);
+  const [captainDetails, setCaptainDetails] = useState(null);
   
   const [rideStatus, setRideStatus] = useState('ACCEPTED');
   const [captainLocation, setCaptainLocation] = useState(captainDetails?.currentLocation || null);
@@ -41,6 +43,24 @@ const RideTracking = () => {
       navigate('/');
     }
   }, [rideDetails, captainDetails, navigate]);
+
+  useEffect(() => {
+    if (!socket || !rideDetails?.rideId) return;
+  
+    const handleRideAccepted = (data) => {
+      if (data.rideId === rideDetails.rideId) {
+        setHasCaptainAccepted(true);
+        setCaptainDetails(data.captainDetails);
+        setRideStatus('ACCEPTED');
+      }
+    };
+  
+    socket.on('rideAccepted', handleRideAccepted);
+  
+    return () => {
+      socket.off('rideAccepted', handleRideAccepted);
+    };
+  }, [socket, rideDetails]);
   
   // Socket event listeners
   useEffect(() => {
@@ -198,153 +218,155 @@ const RideTracking = () => {
         return 'Finding your captain';
     }
   };
-  
-  return (
-    <div className="h-screen flex flex-col">
-      {/* Header */}
-      <div className="bg-primary text-white p-4">
-        <h1 className="text-xl font-bold">Ride Tracking</h1>
-        <p className="text-sm">{getStatusText()}</p>
+return (
+  <div className="h-screen flex flex-col">
+    {/* Header */}
+    <div className="bg-primary text-white p-4">
+      <h1 className="text-xl font-bold">Ride Tracking</h1>
+      <p className="text-sm">{getStatusText()}</p>
+    </div>
+
+    {!hasCaptainAccepted ? (
+      <div className="flex-1 flex flex-col items-center justify-center">
+        <p className="text-lg font-semibold mt-10">Finding your driver...</p>
       </div>
-      
-      {/* Map */}
-      <div className="flex-1 relative">
-        {rideDetails && (
-          <Map
-            center={rideDetails.pickupLocation ? [rideDetails.pickupLocation.lat, rideDetails.pickupLocation.lng] : [0, 0]}
-            zoom={15}
-            style={{ height: '100%', width: '100%' }}
-            ref={mapRef}
-          >
-            <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            />
-            
-            {/* Pickup Location Marker */}
-            {rideDetails.pickupLocation && (
-              <Marker 
-                position={[rideDetails.pickupLocation.lat, rideDetails.pickupLocation.lng]} 
-                icon={pickupIcon}
-              >
-                <Popup>
-                  <div>
-                    <p className="font-semibold">Pickup Location</p>
-                    <p className="text-sm text-gray-600">
-                      {rideDetails.pickupLocation.address || 'Unknown location'}
-                    </p>
-                  </div>
-                </Popup>
-              </Marker>
-            )}
-            
-            {/* Dropoff Location Marker */}
-            {rideDetails.dropoffLocation && (
-              <Marker 
-                position={[rideDetails.dropoffLocation.lat, rideDetails.dropoffLocation.lng]} 
-                icon={dropoffIcon}
-              >
-                <Popup>
-                  <div>
-                    <p className="font-semibold">Dropoff Location</p>
-                    <p className="text-sm text-gray-600">
-                      {rideDetails.dropoffLocation.address || 'Unknown location'}
-                    </p>
-                  </div>
-                </Popup>
-              </Marker>
-            )}
-            
-            {/* Captain Location Marker */}
-            {captainLocation && (
-              <Marker 
-                position={[captainLocation.lat, captainLocation.lng]} 
-                icon={driverIcon}
-              >
-                <Popup>
-                  <div>
-                    <p className="font-semibold">{captainDetails.name}</p>
-                    <p className="text-sm text-gray-600">
-                      {captainDetails.vehicleDetails?.model || 'Vehicle'} - {captainDetails.vehicleDetails?.color || 'Unknown'}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      {captainDetails.vehicleDetails?.licensePlate || 'No plate info'}
-                    </p>
-                  </div>
-                </Popup>
-              </Marker>
-            )}
-          </Map>
-        )}
-      </div>
-      
-      {/* Captain Details Panel */}
-      <div className="bg-white shadow-lg p-4">
-        <div className="flex items-center mb-4">
-          <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
-            <span className="text-xl">{captainDetails?.name?.charAt(0) || 'C'}</span>
-          </div>
-          <div className="ml-3 flex-1">
-            <p className="font-medium">{captainDetails?.name || 'Captain'}</p>
-            <div className="flex items-center">
-              <span className="text-yellow-500">★</span>
-              <span className="text-sm ml-1">{captainDetails?.rating || '4.5'}</span>
-            </div>
-          </div>
-          {captainDetails?.phoneNumber && (
-            <a 
-              href={`tel:${captainDetails.phoneNumber}`} 
-              className="bg-gray-100 p-2 rounded-full"
+    ) : (
+      <>
+        {/* Map */}
+        <div className="flex-1 relative">
+          {rideDetails && (
+            <Map
+              center={rideDetails.pickupLocation ? [rideDetails.pickupLocation.lat, rideDetails.pickupLocation.lng] : [0, 0]}
+              zoom={15}
+              style={{ height: '100%', width: '100%' }}
+              ref={mapRef}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-              </svg>
-            </a>
+              <TileLayer
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution='&copy; <a href="[https://www.openstreetmap.org/copyright">OpenStreetMap</a>](https://www.openstreetmap.org/copyright">OpenStreetMap</a>) contributors'
+              />
+              {/* Pickup Marker */}
+              {rideDetails.pickupLocation && (
+                <Marker 
+                  position={[rideDetails.pickupLocation.lat, rideDetails.pickupLocation.lng]} 
+                  icon={pickupIcon}
+                >
+                  <Popup>
+                    <div>
+                      <p className="font-semibold">Pickup Location</p>
+                      <p className="text-sm text-gray-600">
+                        {rideDetails.pickupLocation.address || 'Unknown location'}
+                      </p>
+                    </div>
+                  </Popup>
+                </Marker>
+              )}
+              {/* Dropoff Marker */}
+              {rideDetails.dropoffLocation && (
+                <Marker 
+                  position={[rideDetails.dropoffLocation.lat, rideDetails.dropoffLocation.lng]} 
+                  icon={dropoffIcon}
+                >
+                  <Popup>
+                    <div>
+                      <p className="font-semibold">Dropoff Location</p>
+                      <p className="text-sm text-gray-600">
+                        {rideDetails.dropoffLocation.address || 'Unknown location'}
+                      </p>
+                    </div>
+                  </Popup>
+                </Marker>
+              )}
+              {/* Captain Marker */}
+              {captainLocation && captainDetails && (
+                <Marker 
+                  position={[captainLocation.lat, captainLocation.lng]} 
+                  icon={driverIcon}
+                >
+                  <Popup>
+                    <div>
+                      <p className="font-semibold">{captainDetails.name}</p>
+                      <p className="text-sm text-gray-600">
+                        {captainDetails.vehicleDetails?.model || 'Vehicle'} - {captainDetails.vehicleDetails?.color || 'Unknown'}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {captainDetails.vehicleDetails?.licensePlate || 'No plate info'}
+                      </p>
+                    </div>
+                  </Popup>
+                </Marker>
+              )}
+            </Map>
           )}
         </div>
-        
-        {/* Vehicle Details */}
-        <div className="bg-gray-100 p-3 rounded mb-4">
-          <div className="flex justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Vehicle</p>
-              <p className="font-medium">{captainDetails?.vehicleDetails?.model || 'Unknown'}</p>
+        {/* Captain Details Panel */}
+        {captainDetails && (
+        <div className="bg-white shadow-lg p-4">
+          <div className="flex items-center mb-4">
+            <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
+              <span className="text-xl">{captainDetails?.name?.charAt(0) || 'C'}</span>
             </div>
-            <div>
-              <p className="text-sm text-gray-600">Color</p>
-              <p className="font-medium">{captainDetails?.vehicleDetails?.color || 'Unknown'}</p>
+            <div className="ml-3 flex-1">
+              <p className="font-medium">{captainDetails?.name || 'Captain'}</p>
+              <div className="flex items-center">
+                <span className="text-yellow-500">★</span>
+                <span className="text-sm ml-1">{captainDetails?.rating || '4.5'}</span>
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-gray-600">License Plate</p>
-              <p className="font-medium">{captainDetails?.vehicleDetails?.licensePlate || 'Unknown'}</p>
+            {captainDetails?.phoneNumber && (
+              <a 
+                href={`tel:${captainDetails.phoneNumber}`} 
+                className="bg-gray-100 p-2 rounded-full"
+              >
+                {/* <svg xmlns="[http://www.w3.org/2000/svg"](http://www.w3.org/2000/svg") className="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                </svg> */}
+              </a>
+            )}
+          </div>
+          {/* Vehicle Details */}
+          <div className="bg-gray-100 p-3 rounded mb-4">
+            <div className="flex justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Vehicle</p>
+                <p className="font-medium">{captainDetails?.vehicleDetails?.model || 'Unknown'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Color</p>
+                <p className="font-medium">{captainDetails?.vehicleDetails?.color || 'Unknown'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">License Plate</p>
+                <p className="font-medium">{captainDetails?.vehicleDetails?.licensePlate || 'Unknown'}</p>
+              </div>
             </div>
           </div>
+          {/* Ride Details */}
+          <div className="flex justify-between mb-4">
+            <div>
+              <p className="text-sm text-gray-600">Ride Type</p>
+              <p className="font-medium capitalize">{rideDetails?.rideType || 'Standard'}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Price</p>
+              <p className="font-medium">${rideDetails?.price || '0'}</p>
+            </div>
+          </div>
+          {/* Action Button */}
+          {rideStatus !== 'RIDE_COMPLETED' && rideStatus !== 'RIDE_CANCELLED' && (
+            <button
+              onClick={handleCancelRide}
+              className="w-full py-3 bg-red-500 text-white rounded font-medium"
+            >
+              Cancel Ride
+            </button>
+          )}
         </div>
-        
-        {/* Ride Details */}
-        <div className="flex justify-between mb-4">
-          <div>
-            <p className="text-sm text-gray-600">Ride Type</p>
-            <p className="font-medium capitalize">{rideDetails?.rideType || 'Standard'}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-600">Price</p>
-            <p className="font-medium">${rideDetails?.price || '0'}</p>
-          </div>
-        </div>
-        
-        {/* Action Button */}
-        {rideStatus !== 'RIDE_COMPLETED' && rideStatus !== 'RIDE_CANCELLED' && (
-          <button
-            onClick={handleCancelRide}
-            className="w-full py-3 bg-red-500 text-white rounded font-medium"
-          >
-            Cancel Ride
-          </button>
         )}
-      </div>
-    </div>
-  );
+      </>
+    )}
+  </div>
+);
 };
 
 export default RideTracking;

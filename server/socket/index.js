@@ -66,6 +66,14 @@ function findNearbyRides(captainId, captainLocation, specificRideId = null) {
         distance: rideData.distance,
         rideType: rideData.rideType
       });
+      // Notify the user that a captain has been found
+      const userSocketId = connectedUsers[rideData.userId];
+      if (userSocketId) {
+        global.io.to(userSocketId).emit('captainFound', {
+          rideId,
+          captainId: closest.id
+        });
+      }
       if (rideData.responseTimeout) clearTimeout(rideData.responseTimeout);
       rideData.responseTimeout = setTimeout(() => {
         if (pendingRideRequests[rideId] && pendingRideRequests[rideId].status === 'pending_response') {
@@ -241,6 +249,14 @@ function setupSocket(io) {
               price: data.price,
               distance: data.distance,
               rideType: data.rideType
+            });
+          }
+          // Notify the user that a captain has been found
+          const userSocketId = connectedUsers[data.userId];
+          if (userSocketId) {
+            io.to(userSocketId).emit('captainFound', {
+              rideId,
+              captainId: assignedCaptain.captainId
             });
           }
           if (pendingRideRequests[rideId].responseTimeout) clearTimeout(pendingRideRequests[rideId].responseTimeout);

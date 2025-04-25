@@ -21,7 +21,7 @@ const ChooseRidePanel = ({
   const contentRef = useRef(null);
   const panelRef = useRef(null);
   const [selectedRide, setSelectedRide] = useState(null); // e.g., 'car', 'auto'
-  // Booking States: INITIAL, SEARCHING, ACCEPTED, FAILED
+  // Booking States: INITIAL, SEARCHING, FOUND, ACCEPTED, FAILED
   const [bookingState, setBookingState] = useState("INITIAL");
   const [errorMessage, setErrorMessage] = useState("");
   const [captainDetails, setCaptainDetails] = useState(null); // Store accepted captain info
@@ -45,6 +45,9 @@ const ChooseRidePanel = ({
       console.log("ChooseRidePanel: Socket not connected yet.");
       return; // Don't set up listeners if socket is not ready
     }
+
+    // Register this user socket on server to receive ride events
+    socket.emit("registerUser", { userId });
 
     // console.log("ChooseRidePanel: Setting up socket listeners.");
 
@@ -95,22 +98,22 @@ const ChooseRidePanel = ({
       console.log("Captain Found:", data);
       if (data.rideId && data.captainId) {
         setCurrentRideId(data.rideId);
-        setBookingState("ACCEPTED");
+        setBookingState("FOUND");
         // Fetch captain details using the public endpoint
         fetch(`${import.meta.env.VITE_BASE_URL}/api/captain/${data.captainId}/public`)
-        .then(res => res.json())
-        .then(response => {
-          if (response.success) {
-            setCaptainDetails({
-              id: data.captainId,
-              ...response.data,
-              estimatedArrival: data.estimatedArrival || 5
-            });
-          }
-        })
-        .catch(err => {
-          console.error("Error fetching captain details:", err);
-        });
+          .then(res => res.json())
+          .then(response => {
+            if (response.success) {
+              setCaptainDetails({
+                id: data.captainId,
+                ...response.data,
+                estimatedArrival: data.estimatedArrival || 5
+              });
+            }
+          })
+          .catch(err => {
+            console.error("Error fetching captain details:", err);
+          });
       }
     };
 
@@ -144,7 +147,7 @@ const ChooseRidePanel = ({
       socket.off("captainLocationUpdate", handleCaptainLocationUpdate);
     };
     // Rerun this effect if the socket instance changes
-  }, [socket, currentRideId, bookingState, captainDetails]); // Add dependencies that handlers rely on
+  }, [socket, currentRideId, bookingState, captainDetails, userId]); // Add dependencies that handlers rely on
 
   // --- Helper Functions ---
   const formatTime = (minutes) => {
@@ -185,7 +188,7 @@ const ChooseRidePanel = ({
       console.error("Socket not connected. Attempting to reconnect...");
       // Try to reconnect or inform the user
       setErrorMessage("Connection issue. Please wait a moment and try again.");
-      
+
       // Wait a moment and try again if the user retries
       return;
     }
@@ -257,9 +260,8 @@ const ChooseRidePanel = ({
   return (
     <div
       ref={panelRef}
-      className={`fixed inset-0 bg-white z-50 transition-transform duration-500 ease-out ${
-        isVisible ? "translate-y-0" : "translate-y-full"
-      }`}
+      className={`fixed inset-0 bg-white z-50 transition-transform duration-500 ease-out ${isVisible ? "translate-y-0" : "translate-y-full"
+        }`}
     >
       {/* Show Driver Details Panel if ride is accepted */}
       {bookingState === "ACCEPTED" && captainDetails ? (
@@ -267,8 +269,8 @@ const ChooseRidePanel = ({
           driver={captainDetails}
           onCancel={() => {
             /* TODO: Implement Cancel Ride Logic */ console.log(
-              "Cancel Ride Clicked"
-            );
+            "Cancel Ride Clicked"
+          );
             setBookingState("INITIAL");
             setCaptainDetails(null);
             setCurrentRideId(null);
@@ -320,15 +322,13 @@ const ChooseRidePanel = ({
                         onClick={() =>
                           bookingState !== "SEARCHING" && setSelectedRide(type)
                         } // Allow selection only if not searching
-                        className={`flex items-center justify-between border-b py-3 transition-all duration-300 ${
-                          selectedRide === type
+                        className={`flex items-center justify-between border-b py-3 transition-all duration-300 ${selectedRide === type
                             ? "bg-gray-200 shadow-inner px-2 rounded"
                             : "hover:bg-gray-100 px-2"
-                        } ${
-                          bookingState === "SEARCHING"
+                          } ${bookingState === "SEARCHING"
                             ? "opacity-50 cursor-not-allowed"
                             : "cursor-pointer"
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center gap-3">
                           <img
@@ -336,8 +336,8 @@ const ChooseRidePanel = ({
                               type === "car"
                                 ? "https://i.pinimg.com/736x/8d/21/7b/8d217b1000b642005fea7b6fd6c3d967.jpg" // Use relative paths from public folder
                                 : type === "auto"
-                                ? "https://www.uber-assets.com/image/upload/f_auto,q_auto:eco,c_fill,h_368,w_552/v1648431773/assets/1d/db8c56-0204-4ce4-81ce-56a11a07fe98/original/Uber_Auto_558x372_pixels_Desktop.png"
-                                : "https://www.uber-assets.com/image/upload/f_auto,q_auto:eco,c_fill,h_368,w_552/v1648177797/assets/fc/ddecaa-2eee-48fe-87f0-614aa7cee7d3/original/Uber_Moto_312x208_pixels_Mobile.png"
+                                  ? "https://www.uber-assets.com/image/upload/f_auto,q_auto:eco,c_fill,h_368,w_552/v1648431773/assets/1d/db8c56-0204-4ce4-81ce-56a11a07fe98/original/Uber_Auto_558x372_pixels_Desktop.png"
+                                  : "https://www.uber-assets.com/image/upload/f_auto,q_auto:eco,c_fill,h_368,w_552/v1648177797/assets/fc/ddecaa-2eee-48fe-87f0-614aa7cee7d3/original/Uber_Moto_312x208_pixels_Mobile.png"
                             }
                             alt={`${type} icon`}
                             className="w-16 h-auto object-contain" // Adjusted size
@@ -369,25 +369,25 @@ const ChooseRidePanel = ({
               )}
 
               <button
-                className={`w-full mt-auto mb-4 p-3 rounded-lg text-lg font-medium transition-colors duration-200 ${
-                  selectedRide &&
-                  (bookingState === "INITIAL" || bookingState === "FAILED")
+                className={`w-full mt-auto mb-4 p-3 rounded-lg text-lg font-medium transition-colors duration-200 ${selectedRide &&
+                    (bookingState === "INITIAL" || bookingState === "FAILED")
                     ? "bg-black text-white hover:bg-gray-800"
                     : bookingState === "SEARCHING"
-                    ? "bg-yellow-500 text-black cursor-wait" // Indicate searching
-                    : "bg-gray-300 text-gray-500 cursor-not-allowed" // Disabled state
-                }`}
+                      ? "bg-yellow-500 text-black cursor-wait" // Indicate searching
+                      : bookingState === "FOUND"
+                        ? "bg-green-500 text-white cursor-pointer" // Indicate found
+                        : "bg-gray-300 text-gray-500 cursor-not-allowed" // Disabled state
+                  }`}
                 disabled={!selectedRide || bookingState === "SEARCHING"}
                 onClick={handleBookRide}
               >
                 {bookingState === "INITIAL" &&
-                  `Book ${
-                    selectedRide ? pricingTiers[selectedRide]?.name : "a ride"
+                  `Book ${selectedRide ? pricingTiers[selectedRide]?.name : "a ride"
                   }`}
                 {bookingState === "SEARCHING" && "Finding your driver..."}
+                {bookingState === "FOUND" && "Driver found!"}
                 {bookingState === "FAILED" &&
-                  `Retry Booking ${
-                    selectedRide ? pricingTiers[selectedRide]?.name : ""
+                  `Retry Booking ${selectedRide ? pricingTiers[selectedRide]?.name : ""
                   }`}
                 {/* Button text handled by showing DriverDetailsPanel when ACCEPTED */}
               </button>
@@ -472,13 +472,13 @@ const DriverDetailsPanel = ({ driver, onCancel, onBack }) => (
     </div>
 
     <div className="flex gap-3 mt-auto mb-2">
-      <button 
+      <button
         onClick={() => window.location.href = `tel:${driver.phoneNumber}`}
         className="flex-1 p-3 bg-gray-100 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-200"
       >
         <i className="ri-phone-line"></i> Call
       </button>
-      <button 
+      <button
         onClick={() => window.location.href = `sms:${driver.phoneNumber}`}
         className="flex-1 p-3 bg-gray-100 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-200"
       >
