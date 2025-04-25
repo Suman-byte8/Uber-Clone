@@ -346,6 +346,36 @@ function setupSocket(io) {
       }
     });
 
+    // --- Ride Cancellation ---
+    socket.on('cancelRide', (data) => {
+      const { rideId } = data;
+      const ride = pendingRideRequests[rideId];
+      if (!ride) return;
+      if (socket.role === 'captain') {
+        // Captain cancels
+        ride.status = 'cancelledByCaptain';
+        const userSocketId = connectedUsers[ride.userId];
+        if (userSocketId) {
+          io.to(userSocketId).emit('rideCancelledByCaptain', { rideId });
+        }
+        if (ride.timeout) clearTimeout(ride.timeout);
+        if (ride.responseTimeout) clearTimeout(ride.responseTimeout);
+        connectedCaptains[socket.userId].isInRide = false;
+        delete pendingRideRequests[rideId];
+      } else if (socket.role === 'user') {
+        // Rider cancels
+        ride.status = 'cancelledByUser';
+        const captainId = ride.captainId;
+        if (captainId && connectedCaptains[captainId]) {
+          io.to(connectedCaptains[captainId].socketId).emit('rideCancelledByUser', { rideId });
+        }
+        if (ride.timeout) clearTimeout(ride.timeout);
+        if (ride.responseTimeout) clearTimeout(ride.responseTimeout);
+        if (captainId && connectedCaptains[captainId]) connectedCaptains[captainId].isInRide = false;
+        delete pendingRideRequests[rideId];
+      }
+    });
+
     // --- Location Updates ---
     socket.on('updateCaptainLocation', (data) => {
       if (!data || typeof data !== 'object') {

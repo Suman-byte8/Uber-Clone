@@ -4,6 +4,8 @@ import gsap from "gsap";
 // Import the hooks for socket and user context
 import { useSocket } from "../context/SocketContext";
 import { useUserContext } from "../context/UserContext";
+import CancelModal from "./CancelModal";
+import NotificationModal from "./NotificationModal";
 
 // Assuming pricingTiers structure is like:
 // { car: { name: 'Comfort', maxPassengers: 4 }, auto: {...}, ... }
@@ -26,6 +28,15 @@ const ChooseRidePanel = ({
   const [errorMessage, setErrorMessage] = useState("");
   const [captainDetails, setCaptainDetails] = useState(null); // Store accepted captain info
   const [currentRideId, setCurrentRideId] = useState(null); // Store the ID of the requested ride
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelledBy, setCancelledBy] = useState(null);
+  const [cancelAllowed, setCancelAllowed] = useState(true);
+  const [showNotification, setShowNotification] = useState(false);
+  useEffect(() => {
+    console.log("showNotification state changed:", showNotification);
+  }, [showNotification]);
+  const [notificationTitle, setNotificationTitle] = useState("");
+  const [notificationMessage, setNotificationMessage] = useState("");
 
   // Get socket instance and user ID from context
   const socket = useSocket();
@@ -62,10 +73,14 @@ const ChooseRidePanel = ({
     };
 
     const handleRideRejected = (data) => {
+      console.log("handleRideRejected event payload:", data);
       console.log("Ride Rejected:", data);
       // Could be rejected by a specific captain, maybe we wait for another or timeout
       // For simplicity now, we'll treat it as failure for this request
       if (data.rideId === currentRideId) {
+        setNotificationTitle("Ride Rejected");
+        setNotificationMessage(data.message || "The captain could not accept the ride.");
+        setShowNotification(true);
         setBookingState("FAILED");
         setErrorMessage(
           "The captain could not accept the ride. Please try again."
@@ -128,6 +143,16 @@ const ChooseRidePanel = ({
       }
     };
 
+    const handleRideCancelledByCaptain = (data) => {
+      if (data.rideId === currentRideId) {
+        setCancelledBy("captain");
+        setShowCancelModal(true);
+        setBookingState("INITIAL");
+        setCaptainDetails(null);
+        setCurrentRideId(null);
+      }
+    };
+
     // Register listeners
     socket.on("rideAccepted", handleRideAccepted);
     socket.on("rideRejected", handleRideRejected); // Assuming server sends this
@@ -135,6 +160,7 @@ const ChooseRidePanel = ({
     socket.on("captainAssigned", handleCaptainAssigned);
     socket.on("captainFound", handleCaptainFound);
     socket.on("captainLocationUpdate", handleCaptainLocationUpdate);
+    socket.on("rideCancelledByCaptain", handleRideCancelledByCaptain);
 
     // Cleanup listeners on component unmount or socket change
     return () => {
@@ -145,9 +171,30 @@ const ChooseRidePanel = ({
       socket.off("captainAssigned", handleCaptainAssigned);
       socket.off("captainFound", handleCaptainFound);
       socket.off("captainLocationUpdate", handleCaptainLocationUpdate);
+      socket.off("rideCancelledByCaptain", handleRideCancelledByCaptain);
     };
     // Rerun this effect if the socket instance changes
   }, [socket, currentRideId, bookingState, captainDetails, userId]); // Add dependencies that handlers rely on
+
+  useEffect(() => {
+    if (bookingState === "ACCEPTED") {
+      setCancelAllowed(true);
+      const timer = setTimeout(() => setCancelAllowed(false), 10000);
+      return () => clearTimeout(timer);
+    } else {
+      setCancelAllowed(true);
+    }
+  }, [bookingState]);
+
+  const handleUserCancel = () => {
+    if (!cancelAllowed || !currentRideId) return;
+    socket.emit("cancelRide", { rideId: currentRideId });
+    setCancelledBy("user");
+    setShowCancelModal(true);
+    setBookingState("INITIAL");
+    setCaptainDetails(null);
+    setCurrentRideId(null);
+  };
 
   // --- Helper Functions ---
   const formatTime = (minutes) => {
@@ -258,150 +305,153 @@ const ChooseRidePanel = ({
   };
 
   return (
-    <div
-      ref={panelRef}
-      className={`fixed inset-0 bg-white z-50 transition-transform duration-500 ease-out ${isVisible ? "translate-y-0" : "translate-y-full"
-        }`}
-    >
-      {/* Show Driver Details Panel if ride is accepted */}
-      {bookingState === "ACCEPTED" && captainDetails ? (
-        <DriverDetailsPanel
-          driver={captainDetails}
-          onCancel={() => {
-            /* TODO: Implement Cancel Ride Logic */ console.log(
-            "Cancel Ride Clicked"
-          );
-            setBookingState("INITIAL");
-            setCaptainDetails(null);
-            setCurrentRideId(null);
-          }}
-          onBack={handleBack} // Allow going back from driver details
-        />
-      ) : (
-        /* Show Ride Selection / Searching Panel */
-        <div ref={contentRef} className="p-4 h-full flex flex-col">
-          <button
-            onClick={handleBack} // Use the modified back handler
-            className="flex items-center text-gray-600 mb-4 hover:text-gray-800"
-          >
-            <i className="ri-arrow-left-line text-2xl mr-2"></i>
-            Back
-          </button>
+    <>
+      <NotificationModal open={showNotification} title={notificationTitle} message={notificationMessage} onClose={() => setShowNotification(false)} />
+      <CancelModal
+        open={showCancelModal}
+        cancelledBy={cancelledBy}
+        onSubmit={(rating) => { console.log("Rating submitted:", rating); setShowCancelModal(false); }}
+        onClose={() => setShowCancelModal(false)}
+      />
+      <div
+        ref={panelRef}
+        className={`fixed inset-0 bg-white z-50 transition-transform duration-500 ease-out ${isVisible ? "translate-y-0" : "translate-y-full"
+          }`}
+      >
+        {/* Show Driver Details Panel if ride is accepted */}
+        {bookingState === "ACCEPTED" && captainDetails ? (
+          <DriverDetailsPanel
+            driver={captainDetails}
+            onCancel={handleUserCancel}
+            onBack={handleBack} // Allow going back from driver details
+            cancelAllowed={cancelAllowed}
+          />
+        ) : (
+          /* Show Ride Selection / Searching Panel */
+          <div ref={contentRef} className="p-4 h-full flex flex-col">
+            <button
+              onClick={handleBack} // Use the modified back handler
+              className="flex items-center text-gray-600 mb-4 hover:text-gray-800"
+            >
+              <i className="ri-arrow-left-line text-2xl mr-2"></i>
+              Back
+            </button>
 
-          {isLoading ? (
-            <div className="flex-grow flex flex-col items-center justify-center text-center">
-              <span className="text-xl font-medium text-gray-600 mb-2">
-                Calculating route...
-              </span>
-              <span className="text-sm text-gray-500">
-                Please wait a moment
-              </span>
-            </div>
-          ) : (
-            <div className="flex-grow flex flex-col">
-              <div className="bg-gray-100 p-3 rounded-lg mb-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Distance:</span>
-                  <span className="font-medium">{distance?.toFixed(1)} km</span>
-                </div>
-                <div className="flex justify-between items-center mt-1">
-                  <span className="text-gray-600">Est. Time:</span>
-                  <span className="font-medium">
-                    {formatTime(estimatedTime)}
-                  </span>
-                </div>
+            {isLoading ? (
+              <div className="flex-grow flex flex-col items-center justify-center text-center">
+                <span className="text-xl font-medium text-gray-600 mb-2">
+                  Calculating route...
+                </span>
+                <span className="text-sm text-gray-500">
+                  Please wait a moment
+                </span>
               </div>
+            ) : (
+              <div className="flex-grow flex flex-col">
+                <div className="bg-gray-100 p-3 rounded-lg mb-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Distance:</span>
+                    <span className="font-medium">{distance?.toFixed(1)} km</span>
+                  </div>
+                  <div className="flex justify-between items-center mt-1">
+                    <span className="text-gray-600">Est. Time:</span>
+                    <span className="font-medium">
+                      {formatTime(estimatedTime)}
+                    </span>
+                  </div>
+                </div>
 
-              <div className="_rides w-full px-2 flex-grow overflow-y-auto">
-                {["car", "auto", "motorcycle"].map(
-                  (type) =>
-                    prices[type] &&
-                    pricingTiers[type] && ( // Ensure price and tier data exists
-                      <div
-                        key={type}
-                        onClick={() =>
-                          bookingState !== "SEARCHING" && setSelectedRide(type)
-                        } // Allow selection only if not searching
-                        className={`flex items-center justify-between border-b py-3 transition-all duration-300 ${selectedRide === type
-                            ? "bg-gray-200 shadow-inner px-2 rounded"
-                            : "hover:bg-gray-100 px-2"
-                          } ${bookingState === "SEARCHING"
-                            ? "opacity-50 cursor-not-allowed"
-                            : "cursor-pointer"
-                          }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <img
-                            src={
-                              type === "car"
-                                ? "https://i.pinimg.com/736x/8d/21/7b/8d217b1000b642005fea7b6fd6c3d967.jpg" // Use relative paths from public folder
-                                : type === "auto"
-                                  ? "https://www.uber-assets.com/image/upload/f_auto,q_auto:eco,c_fill,h_368,w_552/v1648431773/assets/1d/db8c56-0204-4ce4-81ce-56a11a07fe98/original/Uber_Auto_558x372_pixels_Desktop.png"
-                                  : "https://www.uber-assets.com/image/upload/f_auto,q_auto:eco,c_fill,h_368,w_552/v1648177797/assets/fc/ddecaa-2eee-48fe-87f0-614aa7cee7d3/original/Uber_Moto_312x208_pixels_Mobile.png"
-                            }
-                            alt={`${type} icon`}
-                            className="w-16 h-auto object-contain" // Adjusted size
-                          />
-                          <div>
-                            <h4 className="text-lg font-semibold flex items-center gap-1">
-                              {pricingTiers[type].name}
-                              <i className="ri-user-fill text-xs font-normal"></i>
-                              <span className="text-xs font-normal">
-                                {pricingTiers[type].maxPassengers}
-                              </span>
-                            </h4>
-                            <p className="text-xs text-gray-600">
-                              {getEstimatedArrivalTime()} arrival
-                            </p>
+                <div className="_rides w-full px-2 flex-grow overflow-y-auto">
+                  {["car", "auto", "motorcycle"].map(
+                    (type) =>
+                      prices[type] &&
+                      pricingTiers[type] && ( // Ensure price and tier data exists
+                        <div
+                          key={type}
+                          onClick={() =>
+                            bookingState !== "SEARCHING" && setSelectedRide(type)
+                          } // Allow selection only if not searching
+                          className={`flex items-center justify-between border-b py-3 transition-all duration-300 ${selectedRide === type
+                              ? "bg-gray-200 shadow-inner px-2 rounded"
+                              : "hover:bg-gray-100 px-2"
+                            } ${bookingState === "SEARCHING"
+                              ? "opacity-50 cursor-not-allowed"
+                              : "cursor-pointer"
+                            }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <img
+                              src={
+                                type === "car"
+                                  ? "https://i.pinimg.com/736x/8d/21/7b/8d217b1000b642005fea7b6fd6c3d967.jpg" // Use relative paths from public folder
+                                  : type === "auto"
+                                    ? "https://www.uber-assets.com/image/upload/f_auto,q_auto:eco,c_fill,h_368,w_552/v1648431773/assets/1d/db8c56-0204-4ce4-81ce-56a11a07fe98/original/Uber_Auto_558x372_pixels_Desktop.png"
+                                    : "https://www.uber-assets.com/image/upload/f_auto,q_auto:eco,c_fill,h_368,w_552/v1648177797/assets/fc/ddecaa-2eee-48fe-87f0-614aa7cee7d3/original/Uber_Moto_312x208_pixels_Mobile.png"
+                              }
+                              alt={`${type} icon`}
+                              className="w-16 h-auto object-contain" // Adjusted size
+                            />
+                            <div>
+                              <h4 className="text-lg font-semibold flex items-center gap-1">
+                                {pricingTiers[type].name}
+                                <i className="ri-user-fill text-xs font-normal"></i>
+                                <span className="text-xs font-normal">
+                                  {pricingTiers[type].maxPassengers}
+                                </span>
+                              </h4>
+                              <p className="text-xs text-gray-600">
+                                {getEstimatedArrivalTime()} arrival
+                              </p>
+                            </div>
                           </div>
+                          <h2 className="text-lg font-medium">₹{prices[type]}</h2>
                         </div>
-                        <h2 className="text-lg font-medium">₹{prices[type]}</h2>
-                      </div>
-                    )
-                )}
-              </div>
-
-              {/* Error Message Display */}
-              {errorMessage && (
-                <div className="my-2 p-2 text-center text-red-600 bg-red-100 rounded">
-                  {errorMessage}
+                      )
+                  )}
                 </div>
-              )}
 
-              <button
-                className={`w-full mt-auto mb-4 p-3 rounded-lg text-lg font-medium transition-colors duration-200 ${selectedRide &&
-                    (bookingState === "INITIAL" || bookingState === "FAILED")
-                    ? "bg-black text-white hover:bg-gray-800"
-                    : bookingState === "SEARCHING"
-                      ? "bg-yellow-500 text-black cursor-wait" // Indicate searching
-                      : bookingState === "FOUND"
-                        ? "bg-green-500 text-white cursor-pointer" // Indicate found
-                        : "bg-gray-300 text-gray-500 cursor-not-allowed" // Disabled state
-                  }`}
-                disabled={!selectedRide || bookingState === "SEARCHING"}
-                onClick={handleBookRide}
-              >
-                {bookingState === "INITIAL" &&
-                  `Book ${selectedRide ? pricingTiers[selectedRide]?.name : "a ride"
-                  }`}
-                {bookingState === "SEARCHING" && "Finding your driver..."}
-                {bookingState === "FOUND" && "Driver found!"}
-                {bookingState === "FAILED" &&
-                  `Retry Booking ${selectedRide ? pricingTiers[selectedRide]?.name : ""
-                  }`}
-                {/* Button text handled by showing DriverDetailsPanel when ACCEPTED */}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+                {/* Error Message Display */}
+                {errorMessage && (
+                  <div className="my-2 p-2 text-center text-red-600 bg-red-100 rounded">
+                    {errorMessage}
+                  </div>
+                )}
+
+                <button
+                  className={`w-full mt-auto mb-4 p-3 rounded-lg text-lg font-medium transition-colors duration-200 ${selectedRide &&
+                      (bookingState === "INITIAL" || bookingState === "FAILED")
+                      ? "bg-black text-white hover:bg-gray-800"
+                      : bookingState === "SEARCHING"
+                        ? "bg-yellow-500 text-black cursor-wait" // Indicate searching
+                        : bookingState === "FOUND"
+                          ? "bg-green-500 text-white cursor-pointer" // Indicate found
+                          : "bg-gray-300 text-gray-500 cursor-not-allowed" // Disabled state
+                    }`}
+                  disabled={!selectedRide || bookingState === "SEARCHING"}
+                  onClick={handleBookRide}
+                >
+                  {bookingState === "INITIAL" &&
+                    `Book ${selectedRide ? pricingTiers[selectedRide]?.name : "a ride"
+                    }`}
+                  {bookingState === "SEARCHING" && "Finding your driver..."}
+                  {bookingState === "FOUND" && "Driver found!"}
+                  {bookingState === "FAILED" &&
+                    `Retry Booking ${selectedRide ? pricingTiers[selectedRide]?.name : ""
+                    }`}
+                  {/* Button text handled by showing DriverDetailsPanel when ACCEPTED */}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </>
   );
 };
 
 // --- Driver Details Panel (Modified) ---
 // Keep this as a separate component or inline like this
-const DriverDetailsPanel = ({ driver, onCancel, onBack }) => (
+const DriverDetailsPanel = ({ driver, onCancel, onBack, cancelAllowed = true }) => (
   <div className="p-4 h-full flex flex-col">
     <button
       onClick={onBack} // Use the passed onBack handler
@@ -488,6 +538,7 @@ const DriverDetailsPanel = ({ driver, onCancel, onBack }) => (
 
     <button
       onClick={onCancel}
+      disabled={!cancelAllowed}
       className="w-full p-3 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 font-medium"
     >
       Cancel Ride
