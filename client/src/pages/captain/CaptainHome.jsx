@@ -5,7 +5,7 @@ import { CiSettings } from "react-icons/ci";
 import { FaArrowTrendUp } from "react-icons/fa6";
 import { CiCompass1 } from "react-icons/ci";
 import LivePosition from "../../components/LivePosition";
-import pfp from "../../../public/3464ad1c33c983b87d66f14b092f11ee.jpg";
+const pfp = "/3464ad1c33c983b87d66f14b092f11ee.jpg";
 import { Link } from "react-router-dom";
 import UserContext, { useUserContext } from "../../context/UserContext";
 import axios from "axios";

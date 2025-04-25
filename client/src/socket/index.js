@@ -22,7 +22,9 @@ let socket;
  */
 export const initializeSocket = (options = {}) => {
   if (!socket) {
+    const token = localStorage.getItem("token");
     socket = io(BASE_URL, {
+      auth: { token },
       autoConnect: true,
       reconnection: true,
       reconnectionAttempts: 5,
