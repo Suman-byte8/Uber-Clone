@@ -213,7 +213,57 @@ const ChooseRidePanel = ({
   };
 
   // --- Ride Booking ---
-  const handleBookRide = () => {
+  const fetchAddressFromCoordinates = async (lat, lng) => {
+    try {
+      // Use Nominatim API directly from the client
+      // Note: For production, it's better to proxy this through your server
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`,
+        {
+          headers: {
+            'Accept-Language': 'en', // Get results in English
+            'User-Agent': 'UberClone/1.0' // Required by Nominatim
+          }
+        }
+      );
+      
+      if (!response.ok) throw new Error('Failed to fetch address');
+      
+      const data = await response.json();
+      console.log("Nominatim response:", data);
+      
+      // Extract a meaningful address from the response
+      if (data.display_name) {
+        // Often the display_name is too verbose, so we can extract parts
+        const parts = data.display_name.split(', ');
+        // Take first 2-3 parts for a more concise address
+        return parts.slice(0, 3).join(', ');
+      } else if (data.address) {
+        // Build address from components
+        const addressParts = [];
+        const address = data.address;
+        
+        // Try to build a meaningful address from components
+        if (address.road || address.pedestrian || address.neighbourhood) 
+          addressParts.push(address.road || address.pedestrian || address.neighbourhood);
+        if (address.suburb) addressParts.push(address.suburb);
+        if (address.city || address.town || address.village) 
+          addressParts.push(address.city || address.town || address.village);
+        
+        if (addressParts.length > 0) {
+          return addressParts.join(', ');
+        }
+      }
+      
+      return `Location at ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    } catch (error) {
+      console.error('Error fetching address:', error);
+      return `Location at ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    }
+  };
+
+  // Modify the handleBookRide function to use the address information that should already be available
+  const handleBookRide = async () => {
     // Basic validation
     if (
       !selectedRide ||
@@ -234,10 +284,7 @@ const ChooseRidePanel = ({
     // Check socket connection
     if (!socket) {
       console.error("Socket not connected. Attempting to reconnect...");
-      // Try to reconnect or inform the user
       setErrorMessage("Connection issue. Please wait a moment and try again.");
-
-      // Wait a moment and try again if the user retries
       return;
     }
 
@@ -246,47 +293,113 @@ const ChooseRidePanel = ({
       setErrorMessage(""); // Clear previous errors
       setCaptainDetails(null); // Clear previous captain details
 
-      const rideDetails = {
-        userId: userId,
-        pickupLocation: {
-          lat: pickupData.lat,
-          lng: pickupData.lng,
-          address: pickupData.address || "Selected pickup location"
-        },
-        dropoffLocation: {
-          lat: dropoffData.lat,
-          lng: dropoffData.lng,
-          address: dropoffData.address || "Selected destination"
-        },
-        rideType: selectedRide,
-        price: prices[selectedRide],
-        distance: distance,
-        estimatedTime: estimatedTime,
-      };
+      try {
+        // Fetch actual addresses using reverse geocoding
+        const [pickupAddress, dropoffAddress] = await Promise.all([
+          fetchAddressFromCoordinates(pickupData.lat, pickupData.lng),
+          fetchAddressFromCoordinates(dropoffData.lat, dropoffData.lng)
+        ]);
 
-      console.log("Emitting 'requestRide':", rideDetails);
+        console.log("Resolved addresses:", { pickupAddress, dropoffAddress });
 
-      // Emit the ride request to the server
-      socket.emit("requestRide", rideDetails, (response) => {
-        // Optional: Acknowledgement from server
-        if (response?.status === "received" && response?.rideId) {
-          console.log(
-            "Ride request received by server, ride ID:",
-            response.rideId
-          );
-          setCurrentRideId(response.rideId); // Store the ride ID confirmed by the server
-        } else if (response?.status === "error") {
-          console.error(
-            "Server error processing ride request:",
-            response.message
-          );
-          setBookingState("FAILED");
-          setErrorMessage(
-            response.message || "Server error. Please try again."
-          );
-        }
-      });
+        const rideDetails = {
+          userId: userId,
+          pickupLocation: {
+            lat: pickupData.lat,
+            lng: pickupData.lng,
+            address: pickupAddress
+          },
+          dropoffLocation: {
+            lat: dropoffData.lat,
+            lng: dropoffData.lng,
+            address: dropoffAddress
+          },
+          rideType: selectedRide,
+          price: prices[selectedRide],
+          distance: distance,
+          estimatedTime: estimatedTime,
+        };
+
+        console.log("Emitting 'requestRide':", rideDetails);
+
+        // Emit the ride request to the server
+        socket.emit("requestRide", rideDetails, (response) => {
+          if (response?.status === "received" && response?.rideId) {
+            console.log("Ride request received by server, ride ID:", response.rideId);
+            setCurrentRideId(response.rideId);
+          } else if (response?.status === "error") {
+            console.error("Server error processing ride request:", response.message);
+            setBookingState("FAILED");
+            setErrorMessage(response.message || "Server error. Please try again.");
+          }
+        });
+      } catch (error) {
+        console.error("Error preparing ride request:", error);
+        setBookingState("FAILED");
+        setErrorMessage("Failed to get location details. Please try again.");
+      }
     }
+  };
+
+  // Helper function to extract the best available address from location data
+  const extractAddressFromLocationData = (locationData) => {
+    // Log the full object to see what's available
+    console.log("Extracting address from:", locationData);
+    
+    // Try different possible address fields
+    if (typeof locationData === 'object' && locationData !== null) {
+      // If it has a display_name property (common in OpenStreetMap responses)
+      if (locationData.display_name) {
+        return locationData.display_name;
+      }
+      
+      // If it has a formatted_address property (common in Google Maps responses)
+      if (locationData.formatted_address) {
+        return locationData.formatted_address;
+      }
+      
+      // If it has a name property
+      if (locationData.name) {
+        return locationData.name;
+      }
+      
+      // If it has an address property that's a string
+      if (typeof locationData.address === 'string') {
+        return locationData.address;
+      }
+      
+      // If it has an address property that's an object (common in some APIs)
+      if (typeof locationData.address === 'object' && locationData.address !== null) {
+        const addressParts = [];
+        const address = locationData.address;
+        
+        // Try to build an address from components
+        if (address.road) addressParts.push(address.road);
+        if (address.house_number) addressParts.push(address.house_number);
+        if (address.suburb) addressParts.push(address.suburb);
+        if (address.city || address.town) addressParts.push(address.city || address.town);
+        if (address.state) addressParts.push(address.state);
+        
+        if (addressParts.length > 0) {
+          return addressParts.join(', ');
+        }
+      }
+      
+      // If it has a place_name property (common in Mapbox responses)
+      if (locationData.place_name) {
+        return locationData.place_name;
+      }
+    }
+    
+    // If we have lat/lng, create a simple address format
+    if (locationData.lat && (locationData.lng || locationData.lon)) {
+      const lat = locationData.lat;
+      const lng = locationData.lng || locationData.lon;
+      return `Location at ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    }
+    
+    // Fallback
+    return "Location details unavailable";
   };
 
   // --- Back Button Logic ---
@@ -450,101 +563,5 @@ const ChooseRidePanel = ({
   );
 };
 
-// --- Driver Details Panel (Modified) ---
-// Keep this as a separate component or inline like this
-// const DriverDetailsPanel = ({ driver, onCancel, onBack, cancelAllowed = true }) => (
-//   <div className="p-4 h-full flex flex-col">
-//     <button
-//       onClick={onBack} // Use the passed onBack handler
-//       className="flex items-center text-gray-600 mb-4 hover:text-gray-800 self-start"
-//     >
-//       <i className="ri-arrow-left-line text-2xl mr-2"></i>
-//       Back
-//     </button>
-
-//     <h2 className="text-2xl font-bold mb-4 text-center">
-//       Driver is on the way!
-//     </h2>
-
-//     <div className="flex items-center gap-4 border-b pb-4 mb-4">
-//       <img
-//         src={driver.photo || "/default-pfp.png"}
-//         alt={driver.name}
-//         className="w-16 h-16 rounded-full object-cover bg-gray-200"
-//       />
-//       <div>
-//         <h3 className="text-xl font-semibold">{driver.name}</h3>
-//         <div className="flex items-center gap-1 text-sm text-gray-600">
-//           <i className="ri-star-fill text-yellow-400"></i>
-//           <span>{driver.rating?.toFixed(1) || "N/A"}</span>
-//         </div>
-//         {driver.phoneNumber && (
-//           <div className="text-sm text-gray-600 mt-1">
-//             <i className="ri-phone-line mr-1"></i>
-//             {driver.phoneNumber}
-//           </div>
-//         )}
-//       </div>
-//     </div>
-
-//     {driver.vehicle && (
-//       <div className="mb-4">
-//         <h4 className="font-medium text-gray-700 mb-2">Vehicle Details</h4>
-//         <div className="bg-gray-100 p-3 rounded-lg space-y-1 text-gray-800">
-//           <p>
-//             <span className="font-semibold">
-//               {driver.vehicle.make} {driver.vehicle.model}
-//             </span> ({driver.vehicle.color})
-//           </p>
-//           <p className="text-sm text-gray-600">
-//             Year: {driver.vehicle.year}
-//           </p>
-//           <p className="text-lg font-bold tracking-wider bg-yellow-50 p-2 rounded border border-yellow-200">
-//             <span className="text-sm font-normal text-gray-600 mr-2">Number Plate:</span>
-//             {driver.vehicle && driver.vehicle.licensePlate ? driver.vehicle.licensePlate : "Not available"}
-//           </p>
-//         </div>
-//       </div>
-//     )}
-
-//     {driver.estimatedArrival && (
-//       <div className="mb-4">
-//         <h4 className="font-medium text-gray-700 mb-2">Estimated Arrival</h4>
-//         <div className="bg-blue-50 p-3 rounded-lg text-blue-800 font-semibold">
-//           <i className="ri-time-line mr-2"></i>
-//           {driver.estimatedArrival} minutes
-//         </div>
-//       </div>
-//     )}
-
-//     {/* TODO: Add map view here showing driver location */}
-//     <div className="flex-grow flex items-center justify-center text-gray-400 bg-gray-50 rounded my-4">
-//       Map Placeholder
-//     </div>
-
-//     <div className="flex gap-3 mt-auto mb-2">
-//       <button
-//         onClick={() => window.location.href = `tel:${driver.phoneNumber}`}
-//         className="flex-1 p-3 bg-gray-100 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-200"
-//       >
-//         <i className="ri-phone-line"></i> Call
-//       </button>
-//       <button
-//         onClick={() => window.location.href = `sms:${driver.phoneNumber}`}
-//         className="flex-1 p-3 bg-gray-100 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-200"
-//       >
-//         <i className="ri-message-2-line"></i> Message
-//       </button>
-//     </div>
-
-//     <button
-//       onClick={onCancel}
-//       disabled={!cancelAllowed}
-//       className="w-full p-3 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 font-medium"
-//     >
-//       Cancel Ride
-//     </button>
-//   </div>
-// );
 
 export default ChooseRidePanel;

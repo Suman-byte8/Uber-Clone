@@ -11,7 +11,14 @@ import UserContext, { useUserContext } from "../../context/UserContext";
 import axios from "axios";
 
 import { useSocket } from "../../context/SocketContext";
-import { updateLocation, acceptRide, registerCaptain, updateCaptainLocation, rejectRide, cancelRide } from "../../socket/emitters";
+import {
+  updateLocation,
+  acceptRide,
+  registerCaptain,
+  updateCaptainLocation,
+  rejectRide,
+  cancelRide,
+} from "../../socket/emitters";
 import { onNewRideRequest } from "../../socket/listeners";
 import { useToast } from "../../context/ToastContext";
 
@@ -25,9 +32,9 @@ const CaptainHome = () => {
   const [riderDetails, setRiderDetails] = useState(null);
   const [showRideModal, setShowRideModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
-  const [cancelReason, setCancelReason] = useState('');
+  const [cancelReason, setCancelReason] = useState("");
   const [showRejectedModal, setShowRejectedModal] = useState(false);
-  const [rejectedMessage, setRejectedMessage] = useState('');
+  const [rejectedMessage, setRejectedMessage] = useState("");
   const [showRiderProfile, setShowRiderProfile] = useState(false);
   const { captainId: contextCaptainId } = useUserContext();
   const captainId = localStorage.getItem("captainId") || contextCaptainId; // Use the ID from context if available;
@@ -113,15 +120,18 @@ const CaptainHome = () => {
       return;
     }
     if (driverLocation && captainId) {
-      console.log("Emitting captain location update via socket:", driverLocation);
-      
+      console.log(
+        "Emitting captain location update via socket:",
+        driverLocation
+      );
+
       // Use the specialized captain location update emitter
       updateCaptainLocation(socket, {
         captainId,
         location: {
           lat: driverLocation.lat,
-          lng: driverLocation.lon
-        }
+          lng: driverLocation.lon,
+        },
       });
     }
   }, [driverLocation, socket, captainId]);
@@ -132,23 +142,26 @@ const CaptainHome = () => {
 
     const onConnectHandler = () => {
       if (driverLocation && captainId) {
-        console.log("Socket connected, emitting captain location update:", driverLocation);
-        
+        console.log(
+          "Socket connected, emitting captain location update:",
+          driverLocation
+        );
+
         // Use the specialized captain location update emitter
         updateCaptainLocation(socket, {
           captainId,
           location: {
             lat: driverLocation.lat,
-            lng: driverLocation.lon
-          }
+            lng: driverLocation.lon,
+          },
         });
       }
     };
 
-    socket.on('connect', onConnectHandler);
+    socket.on("connect", onConnectHandler);
 
     return () => {
-      socket.off('connect', onConnectHandler);
+      socket.off("connect", onConnectHandler);
     };
   }, [socket, driverLocation, captainId]);
 
@@ -157,22 +170,24 @@ const CaptainHome = () => {
     if (!socket || !captainId) return;
 
     const handleConnect = () => {
-      console.log('Socket connected, registering captain:', captainId);
-      
+      console.log("Socket connected, registering captain:", captainId);
+
       // Register captain with socket server
       registerCaptain(socket, {
         captainId,
         isActive: isDriverOnline,
-        location: driverLocation ? {
-          lat: driverLocation.lat,
-          lng: driverLocation.lon
-        } : null
+        location: driverLocation
+          ? {
+              lat: driverLocation.lat,
+              lng: driverLocation.lon,
+            }
+          : null,
       });
     };
 
     // Listen for socket connection events
-    socket.on('connect', handleConnect);
-    
+    socket.on("connect", handleConnect);
+
     // If socket is already connected, register immediately
     if (socket.connected) {
       handleConnect();
@@ -180,30 +195,32 @@ const CaptainHome = () => {
 
     // Listen for registration acknowledgment
     const handleRegistrationAcknowledged = (data) => {
-      console.log('Captain registration acknowledged:', data);
+      console.log("Captain registration acknowledged:", data);
     };
-    
-    socket.on('registrationAcknowledged', handleRegistrationAcknowledged);
+
+    socket.on("registrationAcknowledged", handleRegistrationAcknowledged);
 
     // Setup periodic re-registration to ensure connection is maintained
     const registrationInterval = setInterval(() => {
       if (socket && socket.connected && driverLocation) {
-        console.log('Periodic captain re-registration');
+        console.log("Periodic captain re-registration");
         registerCaptain(socket, {
           captainId,
           isActive: isDriverOnline,
-          location: driverLocation ? {
-            lat: driverLocation.lat,
-            lng: driverLocation.lon
-          } : null
+          location: driverLocation
+            ? {
+                lat: driverLocation.lat,
+                lng: driverLocation.lon,
+              }
+            : null,
         });
       }
     }, 30000); // Re-register every 30 seconds
 
     // Cleanup
     return () => {
-      socket.off('connect', handleConnect);
-      socket.off('registrationAcknowledged', handleRegistrationAcknowledged);
+      socket.off("connect", handleConnect);
+      socket.off("registrationAcknowledged", handleRegistrationAcknowledged);
       clearInterval(registrationInterval);
     };
   }, [socket, captainId, isDriverOnline, driverLocation]);
@@ -221,12 +238,12 @@ const CaptainHome = () => {
         console.log("Ignoring duplicate ride request:", ride.rideId);
         return;
       }
-      
+
       // Add to seen set
       seenRideRequests.add(ride.rideId);
-      
+
       console.log("New ride request received:", ride);
-      
+
       // Show notification for new ride - DISABLED
       /*
       if ('Notification' in window && Notification.permission === 'granted') {
@@ -236,24 +253,24 @@ const CaptainHome = () => {
         });
       }
       */
-      
+
       // Fetch rider details
       if (ride.userId) {
         fetch(`${import.meta.env.VITE_BASE_URL}/api/user/${ride.userId}/public`)
-          .then(res => res.json())
-          .then(response => {
+          .then((res) => res.json())
+          .then((response) => {
             if (response.success) {
               setRiderDetails({
                 id: ride.userId,
-                ...response.data
+                ...response.data,
               });
             }
           })
-          .catch(err => {
+          .catch((err) => {
             console.error("Error fetching rider details:", err);
           });
       }
-      
+
       setIncomingRide(ride);
       setShowRideModal(true);
     };
@@ -261,16 +278,16 @@ const CaptainHome = () => {
     // Listen for ride cancellations
     const handleRideCancelled = (data) => {
       console.log("Ride cancelled:", data);
-      
-      if (data.cancelledBy === 'user') {
-        showToast('Ride was cancelled by the rider', 'info');
+
+      if (data.cancelledBy === "user") {
+        showToast("Ride was cancelled by the rider", "info");
       }
-      
+
       // Clear current ride state if it matches the cancelled ride
       if (currentRide && currentRide.rideId === data.rideId) {
         setCurrentRide(null);
       }
-      
+
       // Clear incoming ride state if it matches the cancelled ride
       if (incomingRide && incomingRide.rideId === data.rideId) {
         setIncomingRide(null);
@@ -285,20 +302,22 @@ const CaptainHome = () => {
       }
       setCurrentRide(null);
       setShowRejectedModal(true);
-      setRejectedMessage("User rejected the ride. Please wait for a new ride request.");
+      setRejectedMessage(
+        "User rejected the ride. Please wait for a new ride request."
+      );
     };
 
     const handleRideRejected = (data) => {
       setShowRejectedModal(true);
-      setRejectedMessage(data.message || 'Ride was rejected');
+      setRejectedMessage(data.message || "Ride was rejected");
       setCurrentRide(null);
       setIncomingRide(null);
     };
 
-    socket.on('newRideRequest', handleNewRideRequest);
-    socket.on('rideCancelled', handleRideCancelled);
-    socket.on('userRejected', handleUserRejected);
-    socket.on('rideRejected', handleRideRejected);
+    socket.on("newRideRequest", handleNewRideRequest);
+    socket.on("rideCancelled", handleRideCancelled);
+    socket.on("userRejected", handleUserRejected);
+    socket.on("rideRejected", handleRideRejected);
 
     // Request notification permission - DISABLED
     /*
@@ -308,10 +327,10 @@ const CaptainHome = () => {
     */
 
     return () => {
-      socket.off('newRideRequest', handleNewRideRequest);
-      socket.off('rideCancelled', handleRideCancelled);
-      socket.off('userRejected', handleUserRejected);
-      socket.off('rideRejected', handleRideRejected);
+      socket.off("newRideRequest", handleNewRideRequest);
+      socket.off("rideCancelled", handleRideCancelled);
+      socket.off("userRejected", handleUserRejected);
+      socket.off("rideRejected", handleRideRejected);
     };
   }, [socket, showToast, currentRide, incomingRide]);
 
@@ -321,14 +340,21 @@ const CaptainHome = () => {
 
     const handleCounterpartyLocation = (data) => {
       // Only process if this is for the current ride
-      if (currentRide && data.rideId === currentRide.rideId && data.role === 'user') {
-        setRiderDetails((prev) => ({ ...(prev || {}), liveLocation: { lat: data.lat, lng: data.lng } }));
+      if (
+        currentRide &&
+        data.rideId === currentRide.rideId &&
+        data.role === "user"
+      ) {
+        setRiderDetails((prev) => ({
+          ...(prev || {}),
+          liveLocation: { lat: data.lat, lng: data.lng },
+        }));
       }
     };
 
-    socket.on('counterpartyLocation', handleCounterpartyLocation);
+    socket.on("counterpartyLocation", handleCounterpartyLocation);
     return () => {
-      socket.off('counterpartyLocation', handleCounterpartyLocation);
+      socket.off("counterpartyLocation", handleCounterpartyLocation);
     };
   }, [socket, currentRide]);
 
@@ -341,59 +367,61 @@ const CaptainHome = () => {
 
   const handleAcceptRide = () => {
     if (!incomingRide) return;
-    
-    console.log('Accepting ride:', incomingRide);
-    console.log('Current rider details:', riderDetails);
-    
+
+    console.log("Accepting ride:", incomingRide);
+    console.log("Current rider details:", riderDetails);
+
     // Ensure we have rider details before accepting
     if (!riderDetails) {
       fetch(`${import.meta.env.VITE_BASE_URL}/api/user/${incomingRide.userId}`)
-        .then(res => res.json())
-        .then(response => {
-          console.log('Fetched rider details:', response);
+        .then((res) => res.json())
+        .then((response) => {
+          console.log("Fetched rider details:", response);
           if (response.success) {
             setRiderDetails({
               id: incomingRide.userId,
-              ...response.data
+              ...response.data,
             });
           }
         })
-        .catch(err => {
+        .catch((err) => {
           console.error("Error fetching rider details:", err);
         });
     }
-    
+
     acceptRide(socket, {
       rideId: incomingRide.rideId,
       captainId,
-      captainLocation: driverLocation ? {
-        lat: driverLocation.lat,
-        lng: driverLocation.lon
-      } : null,
-      estimatedArrival: 5 // example ETA in minutes
+      captainLocation: driverLocation
+        ? {
+            lat: driverLocation.lat,
+            lng: driverLocation.lon,
+          }
+        : null,
+      estimatedArrival: 5, // example ETA in minutes
     });
-    
+
     // Set as current ride
     setCurrentRide(incomingRide);
-    
+
     // Close the modal
     setShowRideModal(false);
     setIncomingRide(null);
-    
+
     setShowRiderProfile(true);
-    
-    showToast('Ride accepted successfully', 'success');
+
+    showToast("Ride accepted successfully", "success");
   };
 
   const handleRejectRide = () => {
     if (!incomingRide) return;
-    
+
     rejectRide(socket, {
       rideId: incomingRide.rideId,
       captainId,
-      reason: 'Captain unavailable'
+      reason: "Captain unavailable",
     });
-    
+
     // Close the modal
     setShowRideModal(false);
     setIncomingRide(null);
@@ -401,34 +429,37 @@ const CaptainHome = () => {
 
   const handleCancelRide = () => {
     if (!currentRide) return;
-    
+
     cancelRide(socket, {
       rideId: currentRide.rideId,
       userId: currentRide.userId,
       captainId,
-      cancelledBy: 'captain',
-      reason: cancelReason || 'Cancelled by captain'
+      cancelledBy: "captain",
+      reason: cancelReason || "Cancelled by captain",
     });
-    
+
     // Clear current ride
     setCurrentRide(null);
-    
+
     // Close the modal
     setShowCancelModal(false);
-    setCancelReason('');
-    
-    showToast('Ride cancelled successfully', 'info');
+    setCancelReason("");
+
+    showToast("Ride cancelled successfully", "info");
   };
 
-  const handleMapReady = useCallback((map) => {
-    console.log("Map is ready:", map);
-    setMapInstance(map);
-    
-    // If we already have a location, center the map
-    if (driverLocation) {
-      map.setView([driverLocation.lat, driverLocation.lon], 15);
-    }
-  }, [driverLocation]);
+  const handleMapReady = useCallback(
+    (map) => {
+      console.log("Map is ready:", map);
+      setMapInstance(map);
+
+      // If we already have a location, center the map
+      if (driverLocation) {
+        map.setView([driverLocation.lat, driverLocation.lon], 15);
+      }
+    },
+    [driverLocation]
+  );
 
   // Update map view when driver location changes
   useEffect(() => {
@@ -453,20 +484,24 @@ const CaptainHome = () => {
       // Toggle local state first for immediate UI feedback
       const newStatus = !isDriverOnline;
       setIsDriverOnline(newStatus);
-      
+
       // Update status in database
       if (captainId && token) {
-        console.log(`Updating captain status to ${newStatus ? 'online' : 'offline'}`);
-        
+        console.log(
+          `Updating captain status to ${newStatus ? "online" : "offline"}`
+        );
+
         // Call API to update status in database
         const response = await axios.put(
-          `${import.meta.env.VITE_BASE_URL}/api/captain/${captainId}/toggle-status`,
+          `${
+            import.meta.env.VITE_BASE_URL
+          }/api/captain/${captainId}/toggle-status`,
           {},
           {
-            headers: { Authorization: `Bearer ${token}` }
+            headers: { Authorization: `Bearer ${token}` },
           }
         );
-        
+
         if (response.data.success) {
           // If socket is connected, update status via socket too
           if (socket && socket.connected) {
@@ -474,10 +509,12 @@ const CaptainHome = () => {
             registerCaptain(socket, {
               captainId,
               isActive: newStatus,
-              location: driverLocation ? {
-                lat: driverLocation.lat,
-                lng: driverLocation.lon
-              } : null
+              location: driverLocation
+                ? {
+                    lat: driverLocation.lat,
+                    lng: driverLocation.lon,
+                  }
+                : null,
             });
           }
         } else {
@@ -486,7 +523,7 @@ const CaptainHome = () => {
         }
       }
     } catch (error) {
-      console.error('Error toggling driver status:', error);
+      console.error("Error toggling driver status:", error);
       // Revert local state on error
       setIsDriverOnline(!isDriverOnline);
     }
@@ -523,18 +560,18 @@ const CaptainHome = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
             <h2 className="text-xl font-bold mb-4">New Ride Request</h2>
-            
+
             {/* Rider details */}
             <div className="mb-4">
               <h3 className="font-semibold">Rider Details:</h3>
-              <p>{riderDetails?.name || 'Customer'}</p>
-              <p>{riderDetails?.phoneNumber || ''}</p>
+              <p>{riderDetails?.name || "Customer"}</p>
+              <p>{riderDetails?.phoneNumber || ""}</p>
               <div className="flex items-center mt-1">
                 <div className="text-yellow-500 mr-1">★</div>
-                <span>{riderDetails?.rating || '4.5'}</span>
+                <span>{riderDetails?.rating || "4.5"}</span>
               </div>
             </div>
-            
+
             {/* Trip details */}
             <div className="mb-4">
               <h3 className="font-semibold">Trip Details:</h3>
@@ -546,27 +583,29 @@ const CaptainHome = () => {
                 </div>
                 <div className="flex-1">
                   <p className="text-sm mb-2 line-clamp-1">
-                    {incomingRide.pickupLocation.address || 'Pickup location'}
+                    {incomingRide.pickupLocation.address || "Pickup location"}
                   </p>
                   <p className="text-sm line-clamp-1">
-                    {incomingRide.dropoffLocation.address || 'Dropoff location'}
+                    {incomingRide.dropoffLocation.address || "Dropoff location"}
                   </p>
                 </div>
               </div>
             </div>
-            
+
             {/* Fare and distance */}
             <div className="flex justify-between mb-6">
               <div>
                 <h3 className="font-semibold">Estimated Fare:</h3>
-                <p className="text-lg">₹{incomingRide.price || '0'}</p>
+                <p className="text-lg">₹{incomingRide.price || "0"}</p>
               </div>
               <div>
                 <h3 className="font-semibold">Distance:</h3>
-                <p className="text-lg">{incomingRide.distance || '0'} km</p>
+                <p className="text-lg">
+                  {Math.round(incomingRide.distance || 0)} km
+                </p>
               </div>
             </div>
-            
+
             {/* Action buttons */}
             <div className="flex justify-between">
               <button
@@ -591,14 +630,14 @@ const CaptainHome = () => {
         <div className="fixed bottom-20 left-0 right-0 bg-white shadow-lg rounded-t-lg p-4 z-20">
           <div className="flex justify-between items-center mb-2">
             <h3 className="font-bold">Current Ride</h3>
-            <button 
+            <button
               onClick={() => setShowCancelModal(true)}
               className="text-red-500 text-sm"
             >
               Cancel Ride
             </button>
           </div>
-          
+
           <div className="flex items-start">
             <div className="min-w-[24px] mr-2">
               <div className="w-3 h-3 rounded-full bg-green-500 mx-auto"></div>
@@ -607,22 +646,26 @@ const CaptainHome = () => {
             </div>
             <div className="flex-1">
               <p className="text-sm mb-2 line-clamp-1">
-                {currentRide.pickupLocation.address || 'Pickup location'}
+                {currentRide.pickupLocation.address || "Pickup location"}
               </p>
               <p className="text-sm line-clamp-1">
-                {currentRide.dropoffLocation.address || 'Dropoff location'}
+                {currentRide.dropoffLocation.address || "Dropoff location"}
               </p>
             </div>
           </div>
-          
+
           <div className="flex justify-between mt-2">
             <div>
               <span className="text-sm text-gray-600">Fare:</span>
-              <span className="font-semibold ml-1">₹{currentRide.price || '0'}</span>
+              <span className="font-semibold ml-1">
+                ₹{currentRide.price || "0"}
+              </span>
             </div>
             <div>
               <span className="text-sm text-gray-600">Distance:</span>
-              <span className="font-semibold ml-1">{currentRide.distance || '0'} km</span>
+              <span className="font-semibold ml-1">
+                {currentRide.distance || "0"} km
+              </span>
             </div>
           </div>
         </div>
@@ -678,22 +721,28 @@ const CaptainHome = () => {
       {/* Rider profile modal */}
       {showRiderProfile && riderDetails && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          {console.log('Rendering rider profile modal:', riderDetails)}
+          {console.log("Rendering rider profile modal:", riderDetails)}
           <div className="bg-white rounded-lg shadow-lg p-6 w-[90vw] max-w-sm">
-            <h2 className="text-xl font-semibold mb-4 text-center">Rider Profile</h2>
+            <h2 className="text-xl font-semibold mb-4 text-center">
+              Rider Profile
+            </h2>
             <div className="flex flex-col items-center mb-4">
               <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center text-2xl mb-2">
-                {riderDetails.name ? riderDetails.name.charAt(0).toUpperCase() : 'R'}
+                {riderDetails.name
+                  ? riderDetails.name.charAt(0).toUpperCase()
+                  : "R"}
               </div>
-              <p className="font-medium text-lg">{riderDetails.name || 'Rider'}</p>
+              <p className="font-medium text-lg">
+                {riderDetails.name || "Rider"}
+              </p>
               <div className="flex items-center text-yellow-500 mt-1">
-                ★ <span className="ml-1">{riderDetails.rating || '4.5'}</span>
+                ★ <span className="ml-1">{riderDetails.rating || "4.5"}</span>
               </div>
               <div className="mt-2 text-center">
                 <p className="text-sm text-gray-600">
-                  {riderDetails.phoneNumber ? 
-                    `Phone: ${riderDetails.phoneNumber}` : 
-                    'Phone number not available'}
+                  {riderDetails.phoneNumber
+                    ? `Phone: ${riderDetails.phoneNumber}`
+                    : "Phone number not available"}
                 </p>
               </div>
             </div>

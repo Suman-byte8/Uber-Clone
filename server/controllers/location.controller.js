@@ -1,5 +1,6 @@
 const axios = require('axios');
 const NOMINATIM_API_BASE_URL = 'https://nominatim.openstreetmap.org/search';
+const NOMINATIM_REVERSE_API_BASE_URL = 'https://nominatim.openstreetmap.org/reverse';
 const User = require('../models/user.model')
 const mongoose = require('mongoose');
 const Captain = require('../models/captain.model'); // Import Captain model
@@ -121,4 +122,43 @@ const updateLocation = async (req, res) => {
     }
 };
 
-module.exports = { getSuggestions, getCoordinates, updateLocation };
+// New function for reverse geocoding
+const getReverseGeocode = async (req, res) => {
+    const { lat, lon } = req.query;
+
+    // Check if coordinates are provided
+    if (!lat || !lon) {
+        return res.status(400).json({ message: 'Latitude and longitude parameters are required' });
+    }
+
+    try {
+        // Fetch address from Nominatim API using reverse geocoding
+        const response = await axios.get(NOMINATIM_REVERSE_API_BASE_URL, {
+            params: {
+                lat: lat,
+                lon: lon,
+                format: 'json',
+                addressdetails: 1,
+                zoom: 18, // Higher zoom level for more detailed results
+            },
+            headers: {
+                'User-Agent': 'UberClone/1.0' // Nominatim requires a User-Agent header
+            }
+        });
+
+        // Check if data exists
+        if (response.data) {
+            res.json(response.data);
+        } else {
+            res.status(404).json({ message: 'No address found for these coordinates' });
+        }
+    } catch (error) {
+        console.error('Error fetching address from coordinates:', error.message);
+        res.status(500).json({
+            message: 'Error fetching address from coordinates',
+            error: error.message,
+        });
+    }
+};
+
+module.exports = { getSuggestions, getCoordinates, updateLocation, getReverseGeocode };
