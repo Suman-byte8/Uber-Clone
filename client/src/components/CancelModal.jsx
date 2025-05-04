@@ -17,6 +17,19 @@ const CancelModal = ({ open, cancelledBy, onSubmit, onClose }) => {
     setSubmitting(false);
   };
 
+  const showCancellationModal = (cancelledBy) => {
+    let message;
+    if (cancelledBy === 'captain') {
+        message = 'Driver cancelled the ride.';
+    } else if (cancelledBy === 'rider') {
+        message = 'Rider cancelled the ride.';
+    } else {
+        message = 'Ride accepted by the driver. Here are the details:';
+        // Add logic to display driver details here
+    }
+    // Show modal with this message
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
       <div className="bg-white rounded-lg shadow-lg p-6 w-[90vw] max-w-sm">

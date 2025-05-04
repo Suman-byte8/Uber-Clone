@@ -347,7 +347,7 @@ const CaptainHome = () => {
     
     // Ensure we have rider details before accepting
     if (!riderDetails) {
-      fetch(`${import.meta.env.VITE_BASE_URL}/api/user/${incomingRide.userId}/public`)
+      fetch(`${import.meta.env.VITE_BASE_URL}/api/user/${incomingRide.userId}`)
         .then(res => res.json())
         .then(response => {
           console.log('Fetched rider details:', response);

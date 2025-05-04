@@ -103,15 +103,15 @@ export const rejectRide = (socket, rejectData) => {
  * @param {string} cancelData.reason - Optional reason for cancellation
  * @returns {boolean} - True if the event was emitted, false otherwise
  */
-export const cancelRide = (socket, cancelData) => {
+export const cancelRide = (socket, data) => {
   if (socket && socket.connected) {
     socket.emit('cancelRide', {
-      ...cancelData,
-      cancelTime: new Date().toISOString()
+      rideId: data.rideId,
+      cancelledBy: data.cancelledBy
     });
     return true;
   }
-  console.warn('Socket not connected. Ride cancellation not sent.');
+  console.warn('Socket not connected. Ride cancellation not sent.', data);
   return false;
 };
 
@@ -183,3 +183,16 @@ export const updateCaptainLocation = (socket, locationData) => {
   console.warn('Socket not connected. Captain location update not sent.');
   return false;
 };
+
+
+export const startCancellationTimer = (socket, data) => {
+  if (socket && socket.connected) {
+    socket.emit('startCancellationTimer', {
+      rideId: data.rideId,
+      time: data.time
+    });
+    return true;
+  }
+  console.warn('Socket not connected. Cancellation timer not started.', data);
+  return false;
+}
