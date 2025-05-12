@@ -664,7 +664,7 @@ const CaptainHome = () => {
             <div>
               <span className="text-sm text-gray-600">Distance:</span>
               <span className="font-semibold ml-1">
-                {currentRide.distance || "0"} km
+              {Math.round(currentRide.distance || 0)} km
               </span>
             </div>
           </div>

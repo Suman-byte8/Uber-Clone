@@ -1,6 +1,5 @@
 const axios = require('axios');
-const NOMINATIM_API_BASE_URL = 'https://nominatim.openstreetmap.org/search';
-const NOMINATIM_REVERSE_API_BASE_URL = 'https://nominatim.openstreetmap.org/reverse';
+
 const User = require('../models/user.model')
 const mongoose = require('mongoose');
 const Captain = require('../models/captain.model'); // Import Captain model
@@ -17,7 +16,7 @@ const getSuggestions = async (req, res) => {
 
     try {
         // Fetch suggestions from Nominatim API
-        const response = await axios.get(NOMINATIM_API_BASE_URL, {
+        const response = await axios.get(process.env.NOMINATIM_API_BASE_URL, {
             params: {
                 q: query,
                 format: 'json',
@@ -52,7 +51,7 @@ const getCoordinates = async (req, res) => {
 
     try {
         // Fetch coordinates from Nominatim API
-        const response = await axios.get(NOMINATIM_API_BASE_URL, {
+        const response = await axios.get(process.env.NOMINATIM_API_BASE_URL, {
             params: {
                 q: query,
                 format: 'json',
@@ -133,7 +132,7 @@ const getReverseGeocode = async (req, res) => {
 
     try {
         // Fetch address from Nominatim API using reverse geocoding
-        const response = await axios.get(NOMINATIM_REVERSE_API_BASE_URL, {
+        const response = await axios.get(process.env.NOMINATIM_REVERSE_API_BASE_URL, {
             params: {
                 lat: lat,
                 lon: lon,
