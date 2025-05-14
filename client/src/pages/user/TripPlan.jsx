@@ -314,7 +314,7 @@ const TripPlan = () => {
   };
 
   return (
-    <div className="relative h-screen w-full">
+    <div className="relative h-screen w-full overflow-hidden">
       <button
         onClick={() => window.history.back()}
         className="rounded-full bg-[#252525] w-12 h-12 absolute top-4 left-4 text-white flex items-center justify-center z-10 hover:scale-105 transition-transform duration-300"
@@ -322,7 +322,7 @@ const TripPlan = () => {
         <i className="ri-arrow-left-line text-3xl"></i>
       </button>
 
-      <div className="h-full w-full z-[1]">
+      <div className="h- w-full z-[1]">
         <LivePosition location={location} />
       </div>
 
@@ -330,7 +330,10 @@ const TripPlan = () => {
         <div
           ref={panelRef}
           className="w-full p-2 absolute bottom-0 bg-[#252525] rounded-t-xl z-10"
-          style={{ height: panelState.height, paddingBottom: panelState.paddingBottom }}
+          style={{
+            height: panelState.height,
+            paddingBottom: panelState.isOpen ? panelState.paddingBottom : "0",
+          }}
         >
           <button onClick={togglePanel} className="w-full h-10 flex items-center justify-center text-white">
             <i className={`ri-arrow-${panelState.isOpen ? "down" : "up"}-wide-line text-2xl transition-transform duration-500 ease-in-out ${panelState.isOpen ? "rotate-180" : ""}`} />
