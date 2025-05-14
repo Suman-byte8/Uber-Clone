@@ -21,6 +21,7 @@ import {
 } from "../../socket/emitters";
 import { onNewRideRequest } from "../../socket/listeners";
 import { useToast } from "../../context/ToastContext";
+import CancellationModal from "../../components/CancellationModal"; // Import CancellationModal
 
 const CaptainHome = () => {
   const [isDriverOnline, setIsDriverOnline] = useState(false);
@@ -31,17 +32,22 @@ const CaptainHome = () => {
   const [currentRide, setCurrentRide] = useState(null);
   const [riderDetails, setRiderDetails] = useState(null);
   const [showRideModal, setShowRideModal] = useState(false);
-  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showDriverCancelConfirmModal, setShowDriverCancelConfirmModal] = useState(false); // For driver's own cancellation confirmation
   const [cancelReason, setCancelReason] = useState("");
   const [showRejectedModal, setShowRejectedModal] = useState(false);
   const [rejectedMessage, setRejectedMessage] = useState("");
+  const [showCancellationPopup, setShowCancellationPopup] = useState(false); // For the final "Ride Cancelled by X"
+  const [cancellationPopupInitiator, setCancellationPopupInitiator] = useState(null); // 'driver' or 'rider'
   const [showRiderProfile, setShowRiderProfile] = useState(false);
+  const [cancelAllowed, setCancelAllowed] = useState(true);
+  const [timeLeft, setTimeLeft] = useState(10); // 10-second timer
   const { captainId: contextCaptainId } = useUserContext();
   const captainId = localStorage.getItem("captainId") || contextCaptainId; // Use the ID from context if available;
   const token = localStorage.getItem("token");
   const { showToast } = useToast();
 
   const socket = useSocket();
+  console.log("Socket instance in CaptainHome:", socket);
 
   useEffect(() => {
     const getLocation = () => {
@@ -278,20 +284,30 @@ const CaptainHome = () => {
     // Listen for ride cancellations
     const handleRideCancelled = (data) => {
       console.log("Ride cancelled:", data);
+      console.log("DRIVER_VIEW (CaptainHome): Received 'rideCancelled' event. Data:", JSON.stringify(data), "Current Ride:", JSON.stringify(currentRide), "Incoming Ride:", JSON.stringify(incomingRide));
 
-      if (data.cancelledBy === "user") {
-        showToast("Ride was cancelled by the rider", "info");
-      }
+      const rideMatchesCurrent = currentRide && currentRide.rideId === data.rideId;
+      const rideMatchesIncoming = incomingRide && incomingRide.rideId === data.rideId;
 
-      // Clear current ride state if it matches the cancelled ride
-      if (currentRide && currentRide.rideId === data.rideId) {
+      console.log("DRIVER_VIEW (CaptainHome): rideMatchesCurrent:", rideMatchesCurrent, "rideMatchesIncoming:", rideMatchesIncoming);
+      if (rideMatchesCurrent || rideMatchesIncoming) {
+        if (data.cancelledBy === 'rider') {
+          console.log("Ride cancelled by rider (driver's home view)");
+        }
+        setCancellationPopupInitiator(data.cancelledBy); // 'rider' or 'driver'
+        setShowCancellationPopup(true);
+
+        if (rideMatchesCurrent) {
+          setCurrentRide(null);
+        }
+        if (rideMatchesIncoming) {
+          setIncomingRide(null);
+          setShowRideModal(false);
+        }
+      } else if (data.cancelledBy === "user") { // Fallback for toast if not current/incoming
+        // This might be redundant if the modal handles all cases
+        // showToast("A ride was cancelled by the rider", "info");
         setCurrentRide(null);
-      }
-
-      // Clear incoming ride state if it matches the cancelled ride
-      if (incomingRide && incomingRide.rideId === data.rideId) {
-        setIncomingRide(null);
-        setShowRideModal(false);
       }
     };
 
@@ -365,6 +381,47 @@ const CaptainHome = () => {
     }
   }, [showRiderProfile]);
 
+  useEffect(() => {
+    if (!socket) return;
+
+    socket.on("rideCancelled", (data) => {
+      console.log(`${data.cancelledBy} cancelled the ride`);
+
+      // Disconnect the socket
+      socket.disconnect();
+
+      // Reset the driver view
+      setCurrentRide(null); // Clear the current ride details
+      setIncomingRide(null); // Clear any incoming ride details
+      setShowRideModal(false); // Close any open ride modal
+      showToast("Ride has been cancelled by the rider", "error"); // Optional: Show a toast notification
+    });
+
+    return () => {
+      socket.off("rideCancelled");
+    };
+  }, [socket]);
+
+  useEffect(() => {
+    if (currentRide && cancelAllowed) {
+      const timer = setInterval(() => {
+        setTimeLeft((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            setCancelAllowed(false); // Disable cancel button after 10 seconds
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => clearInterval(timer); // Cleanup timer on unmount
+    } else {
+      setCancelAllowed(true);
+      setTimeLeft(10); // Reset timer when no ride is active
+    }
+  }, [currentRide, cancelAllowed]);
+
   const handleAcceptRide = () => {
     if (!incomingRide) return;
 
@@ -428,24 +485,21 @@ const CaptainHome = () => {
   };
 
   const handleCancelRide = () => {
-    if (!currentRide) return;
+    if (!socket || !currentRide) return;
 
-    cancelRide(socket, {
+    // Emit the rideCancelled event
+    socket.emit("rideCancelled", {
       rideId: currentRide.rideId,
-      userId: currentRide.userId,
-      captainId,
-      cancelledBy: "captain",
-      reason: cancelReason || "Cancelled by captain",
+      cancelledBy: "driver", // Specify that the driver canceled the ride
     });
 
-    // Clear current ride
-    setCurrentRide(null);
+    console.log("Ride cancelled by driver");
 
-    // Close the modal
-    setShowCancelModal(false);
-    setCancelReason("");
-
-    showToast("Ride cancelled successfully", "info");
+    // Reset the driver view
+    setCurrentRide(null); // Clear the current ride details
+    setIncomingRide(null); // Clear any incoming ride details
+    setShowRideModal(false); // Close any open ride modal
+    showToast("You have canceled the ride", "error"); // Optional: Show a toast notification
   };
 
   const handleMapReady = useCallback(
@@ -631,10 +685,11 @@ const CaptainHome = () => {
           <div className="flex justify-between items-center mb-2">
             <h3 className="font-bold">Current Ride</h3>
             <button
-              onClick={() => setShowCancelModal(true)}
-              className="text-red-500 text-sm"
+              onClick={() => setShowDriverCancelConfirmModal(true)}
+              disabled={!cancelAllowed} // Disable button after 10 seconds
+              className={`text-sm ${cancelAllowed ? "text-red-500" : "text-gray-400 cursor-not-allowed"}`}
             >
-              Cancel Ride
+              Cancel Ride {cancelAllowed && `(${timeLeft}s)`} {/* Show timer */}
             </button>
           </div>
 
@@ -671,35 +726,43 @@ const CaptainHome = () => {
         </div>
       )}
 
-      {/* Cancel ride modal */}
-      {showCancelModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded shadow-lg max-w-md w-full">
-            <h2 className="text-xl font-bold mb-4">Cancel Ride</h2>
-            <p>Are you sure you want to cancel the ride?</p>
-            <input
-              type="text"
-              value={cancelReason}
-              onChange={(e) => setCancelReason(e.target.value)}
-              placeholder="Reason for cancellation (optional)"
-              className="w-full p-2 border border-gray-300 rounded"
-            />
-            <div className="mt-4 flex justify-end space-x-4">
+      {/* Driver's confirmation modal for cancelling a ride */}
+      {showDriverCancelConfirmModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-30">
+          <div className="bg-white p-4 rounded-lg shadow-lg">
+            <h3 className="text-lg font-bold mb-2">Cancel Ride</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Are you sure you want to cancel this ride?
+            </p>
+            <div className="flex justify-end gap-2">
               <button
-                onClick={() => setShowCancelModal(false)}
-                className="px-4 py-2 bg-gray-500 text-white rounded"
+                onClick={() => setShowDriverCancelConfirmModal(false)} // Close modal
+                className="px-4 py-2 bg-gray-200 rounded-lg text-sm"
               >
-                Cancel
+                No
               </button>
               <button
-                onClick={handleCancelRide}
-                className="px-4 py-2 bg-red-500 text-white rounded"
+                onClick={() => {
+                  handleCancelRide(); // Call the cancel ride function
+                  setShowDriverCancelConfirmModal(false); // Close modal
+                }}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm"
               >
-                Confirm Cancellation
+                Yes, Cancel
               </button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Generic "Ride Cancelled by X" Modal */}
+      {showCancellationPopup && (
+        <CancellationModal
+          isOpen={showCancellationPopup}
+          onClose={() => setShowCancellationPopup(false)}
+          cancelledBy={cancellationPopupInitiator}
+          isDriver={true} />
+          
       )}
 
       {/* User rejected modal */}

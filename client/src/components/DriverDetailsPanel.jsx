@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useSocket } from "../context/SocketContext"; // Adjust the import path as necessary
 
 const DriverDetailsPanel = ({ driver, onCancel, onBack, cancelAllowed = true }) => {
   const [timeLeft, setTimeLeft] = useState(10);
   const [cancellationExpired, setCancellationExpired] = useState(false);
-  
+  const socket = useSocket();
+
   useEffect(() => {
     // Only start the timer if cancellation is allowed
     if (!cancelAllowed) return;
@@ -23,6 +25,19 @@ const DriverDetailsPanel = ({ driver, onCancel, onBack, cancelAllowed = true }) 
     // Clean up the timer
     return () => clearInterval(timer);
   }, [cancelAllowed]);
+
+  const handleCancelRide = () => {
+    if (!cancelAllowed || cancellationExpired) return;
+
+    // Emit the cancelRide event
+    socket.emit("rideCancelled", {
+      rideId: driver.rideId, // Assuming `rideId` is part of the `driver` object
+      cancelledBy: "rider", // Specify who canceled the ride
+    });
+
+    console.log("Ride cancelled by rider");
+    if (onCancel) onCancel(); // Call the onCancel prop if provided
+  };
   
   return (
     <div className="p-4 h-full flex flex-col">
@@ -111,7 +126,7 @@ const DriverDetailsPanel = ({ driver, onCancel, onBack, cancelAllowed = true }) 
 
       <div className="flex items-center gap-2">
         <button
-          onClick={onCancel}
+          onClick={handleCancelRide}
           disabled={!cancelAllowed || cancellationExpired}
           className={`flex-1 p-3 ${
             !cancelAllowed || cancellationExpired 

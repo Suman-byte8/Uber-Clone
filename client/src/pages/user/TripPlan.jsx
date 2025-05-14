@@ -5,6 +5,7 @@ import LivePosition from "../../components/LivePosition";
 import PickUpPanel from "../../components/PickUpPanel";
 import ChooseRidePanel from "../../components/ChooseRidePanel";
 import { useUserContext } from "../../context/UserContext";
+import { useSocket } from "../../context/SocketContext";
 
 const debounce = (func, delay) => {
   let timer;
@@ -46,14 +47,14 @@ const TripPlan = () => {
   const { userId } = useUserContext();
   const panelRef = useRef(null);
   const contentRef = useRef(null);
-
+  
   const [panelState, setPanelState] = useState({
     isOpen: false,
     height: "90px",
     fullHeight: "100vh",
     paddingBottom: "3rem",
   });
-
+  
   const [activeInput, setActiveInput] = useState(null);
   const [pickupState, setPickupState] = useState({ query: "", suggestions: [], isLoading: false, active: true, error: null });
   const [dropoffState, setDropoffState] = useState({ query: "", suggestions: [], isLoading: false, active: false, error: null, isVisible: false });
@@ -66,10 +67,25 @@ const TripPlan = () => {
     motorcycle: null
   });
   const [estimatedTime, setEstimatedTime] = useState(null);
-
+  
   const [pickupCords, setPickupCords] = useState(null);
   const [dropoffCords, setDropoffCords] = useState(null);
+  
+  const socket = useSocket();
+  console.log("Socket instance in TripPlan:", socket);
+  
+  useEffect(() => {
+    if (!socket) return;
 
+    socket.on("rideCancelled", (data) => {
+      console.log(`${data.cancelledBy} cancelled the ride`);
+    });
+
+    return () => {
+      socket.off("rideCancelled");
+    };
+  }, [socket]);
+  
   // function to fetch suggestions 
   const fetchSuggestions = async (query, setState) => {
     if (!query.trim()) return;
@@ -353,3 +369,5 @@ const TripPlan = () => {
 };
 
 export default TripPlan;
+
+

@@ -130,4 +130,44 @@ export const onConnectionError = (callback) => {
   return () => {};
 };
 
+/**
+ * Set up a listener for ride cancelled by user (rider)
+ * @param {Function} callback - Function to call when rideCancelledByUser event is received
+ * @returns {Function} - Function to remove the listener
+ */
+export const onRideCancelledByUser = (callback) => {
+  const socket = getSocket();
+
+  if (socket) {
+    socket.on('rideCancelledByUser', callback);
+
+    return () => {
+      socket.off('rideCancelledByUser', callback);
+    };
+  }
+
+  console.warn('Socket not initialized. rideCancelledByUser listener not set up.');
+  return () => {};
+};
+
+/**
+ * Set up a listener for ride cancelled (driver)
+ * @param {Function} callback - Function to call when rideCancelled event is received
+ * @returns {Function} - Function to remove the listener
+ */
+export const onRideCancelled = (callback) => {
+  const socket = getSocket();
+
+  if (socket) {
+    socket.on('rideCancelled', callback);
+
+    return () => {
+      socket.off('rideCancelled', callback);
+    };
+  }
+
+  console.warn('Socket not initialized. rideCancelled listener not set up.');
+  return () => {};
+};
+
 // Add more listener setup functions as needed

@@ -4,8 +4,8 @@ import gsap from "gsap";
 // Import the hooks for socket and user context
 import { useSocket } from "../context/SocketContext";
 import { useUserContext } from "../context/UserContext";
-import CancelModal from "./CancelModal";
 import NotificationModal from "./NotificationModal";
+import CancellationModal from "./CancellationModal"; // Import the correct modal
 import DriverDetailsPanel from "./DriverDetailsPanel"; // Assuming this is a separate component
 
 // Assuming pricingTiers structure is like:
@@ -29,8 +29,8 @@ const ChooseRidePanel = ({
   const [errorMessage, setErrorMessage] = useState("");
   const [captainDetails, setCaptainDetails] = useState(null); // Store accepted captain info
   const [currentRideId, setCurrentRideId] = useState(null); // Store the ID of the requested ride
-  const [showCancelModal, setShowCancelModal] = useState(false);
-  const [cancelledBy, setCancelledBy] = useState(null);
+  const [showCancellationInfoModal, setShowCancellationInfoModal] = useState(false);
+  const [cancellationInfoSource, setCancellationInfoSource] = useState(null); // 'rider' or 'driver'
   const [cancelAllowed, setCancelAllowed] = useState(true);
   const [showNotification, setShowNotification] = useState(false);
   useEffect(() => {
@@ -144,13 +144,27 @@ const ChooseRidePanel = ({
       }
     };
 
-    const handleRideCancelledByCaptain = (data) => {
+    const handleRideCancelled = (data) => {
+      console.log(
+        "RIDER_VIEW (ChooseRidePanel): Received 'rideCancelled' event. Data:",
+        JSON.stringify(data),
+        "Current Ride ID:",
+        currentRideId
+      );
+
       if (data.rideId === currentRideId) {
-        setCancelledBy("captain");
-        setShowCancelModal(true);
-        setBookingState("INITIAL");
-        setCaptainDetails(null);
-        setCurrentRideId(null);
+        console.log("RIDER_VIEW (ChooseRidePanel): rideId matches currentRideId.");
+        if (data.cancelledBy === "driver") {
+          console.log("Ride cancelled by driver (rider's view)");
+          setNotificationTitle("Ride Cancelled");
+          setNotificationMessage("The driver has canceled the ride.");
+          setShowNotification(true); // Show toast or modal notification
+        }
+        setCancellationInfoSource(data.cancelledBy); // 'driver' or 'rider'
+        setShowCancellationInfoModal(true); // Show cancellation modal
+        setBookingState("INITIAL"); // Reset booking state
+        setCaptainDetails(null); // Clear captain details
+        setCurrentRideId(null); // Clear current ride ID
       }
     };
 
@@ -161,7 +175,7 @@ const ChooseRidePanel = ({
     socket.on("captainAssigned", handleCaptainAssigned);
     socket.on("captainFound", handleCaptainFound);
     socket.on("captainLocationUpdate", handleCaptainLocationUpdate);
-    socket.on("rideCancelledByCaptain", handleRideCancelledByCaptain);
+    socket.on("rideCancelled", handleRideCancelled);
 
     // Cleanup listeners on component unmount or socket change
     return () => {
@@ -172,7 +186,7 @@ const ChooseRidePanel = ({
       socket.off("captainAssigned", handleCaptainAssigned);
       socket.off("captainFound", handleCaptainFound);
       socket.off("captainLocationUpdate", handleCaptainLocationUpdate);
-      socket.off("rideCancelledByCaptain", handleRideCancelledByCaptain);
+      socket.off("rideCancelled", handleRideCancelled);
     };
     // Rerun this effect if the socket instance changes
   }, [socket, currentRideId, bookingState, captainDetails, userId]); // Add dependencies that handlers rely on
@@ -189,10 +203,16 @@ const ChooseRidePanel = ({
 
   const handleUserCancel = () => {
     if (!cancelAllowed || !currentRideId) return;
-    socket.emit("cancelRide", { rideId: currentRideId });
-    setCancelledBy("user");
-    setShowCancelModal(true);
+    socket.emit("cancelRide", { 
+      rideId: currentRideId, 
+      cancelledBy: 'rider', 
+      userId, 
+      captainId: captainDetails?.id 
+    });
+    setCancellationInfoSource('rider');
+    setShowCancellationInfoModal(true);
     setBookingState("INITIAL");
+    setErrorMessage("");
     setCaptainDetails(null);
     setCurrentRideId(null);
   };
@@ -420,12 +440,27 @@ const ChooseRidePanel = ({
 
   return (
     <>
-      <NotificationModal open={showNotification} title={notificationTitle} message={notificationMessage} onClose={() => setShowNotification(false)} />
-      <CancelModal
-        open={showCancelModal}
-        cancelledBy={cancelledBy}
-        onSubmit={(rating) => { console.log("Rating submitted:", rating); setShowCancelModal(false); }}
-        onClose={() => setShowCancelModal(false)}
+      <NotificationModal
+        open={showNotification}
+        title={notificationTitle}
+        message={notificationMessage}
+        onClose={() => setShowNotification(false)}
+      />
+      {/* This is the modal that shows who cancelled the ride */}
+      <CancellationModal
+        isOpen={showCancellationInfoModal}
+        onClose={() => {
+          setShowCancellationInfoModal(false);
+          // Reset panel to initial state, similar to parts of handleBack
+          setBookingState("INITIAL");
+          setErrorMessage("");
+          setCaptainDetails(null);
+          setCurrentRideId(null);
+          // Optionally call onBack() if you want to navigate away completely
+          // onBack(); 
+        }}
+        cancelledBy={cancellationInfoSource}
+        isDriver={false} // This is the rider's view
       />
       <div
         ref={panelRef}

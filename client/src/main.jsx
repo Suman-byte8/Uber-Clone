@@ -10,14 +10,12 @@ import { SocketProvider } from "./context/SocketContext.jsx";
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <BrowserRouter>
-      {" "}
-      {/* Wrap everything inside BrowserRouter */}
       <UserProvider>
-        <ToastProvider>
-          <SocketProvider>
+        <SocketProvider>
+          <ToastProvider>
             <App />
-          </SocketProvider>
-        </ToastProvider>
+          </ToastProvider>
+        </SocketProvider>
       </UserProvider>
     </BrowserRouter>
   </React.StrictMode>

@@ -75,63 +75,26 @@ function handleRideAccepted(socket, io, data) {
 
 // Handle ride cancellation
 function handleRideCancel(socket, io, data) {
-  const { rideId, cancelledBy, reason } = data;
-  
-  if (!pendingRideRequests[rideId]) {
-    socket.emit('error', { message: 'Ride not found' });
-    return;
+  const { rideId, cancelledBy } = data;
+
+  console.log(`${cancelledBy} cancelled the ride`);
+
+  // Notify the rider and driver about the cancellation
+  const ride = pendingRideRequests[rideId];
+  if (ride) {
+    if (connectedUsers[ride.userId]) {
+      io.to(connectedUsers[ride.userId]).emit("rideCancelled", {
+        rideId,
+        cancelledBy,
+      });
+    }
+    if (connectedCaptains[ride.captainId]?.socketId) {
+      io.to(connectedCaptains[ride.captainId].socketId).emit("rideCancelled", {
+        rideId,
+        cancelledBy,
+      });
+    }
   }
-  
-  const rideData = pendingRideRequests[rideId];
-  
-  // Check if cancellation is within the window
-  const canCancel = cancellationWindows[rideId] && 
-                    Date.now() <= cancellationWindows[rideId].expiresAt;
-  
-  if (!canCancel) {
-    socket.emit('error', { 
-      message: 'Cancellation window has expired',
-      code: 'CANCELLATION_EXPIRED'
-    });
-    return;
-  }
-  
-  // Clear the cancellation window timeout
-  if (cancellationWindows[rideId] && cancellationWindows[rideId].timeoutId) {
-    clearTimeout(cancellationWindows[rideId].timeoutId);
-    delete cancellationWindows[rideId];
-  }
-  
-  // Update ride status
-  rideData.status = 'cancelled';
-  rideData.cancellationReason = reason;
-  rideData.cancelledBy = cancelledBy;
-  
-  // Notify both parties about the cancellation
-  if (connectedUsers[rideData.userId]) {
-    io.to(connectedUsers[rideData.userId]).emit('rideCancelledByUser', {
-      rideId,
-      cancelledBy,
-      reason: reason || 'Cancelled by ' + cancelledBy
-    });
-  }
-  
-  // Notify the captain about cancellation
-  if (rideData.captainId && 
-      connectedCaptains[rideData.captainId] && 
-      connectedCaptains[rideData.captainId].socketId) {
-    io.to(connectedCaptains[rideData.captainId].socketId).emit('rideCancelled', {
-      rideId,
-      cancelledBy,
-      reason
-    });
-  }
-  
-  // Clear the ride from pending requests
-  delete pendingRideRequests[rideId];
-  
-  // Confirm cancellation to the requester
-  socket.emit('rideCancellationConfirmed', { rideId });
 }
 
 // Check cancellation window status

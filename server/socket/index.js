@@ -513,6 +513,12 @@ function setupSocket(io) {
         delete connectedUsers[socket.userId];
       }
     });
+
+    socket.on("rideCancelled", (data) => {
+      console.log("Ride cancelled by rider");
+      // Broadcast to the driver
+      socket.broadcast.emit("rideCancelled", data);
+    });
   });
 }
 

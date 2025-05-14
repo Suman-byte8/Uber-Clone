@@ -43,28 +43,17 @@ export const SocketProvider = ({ children }) => {
       reconnectionDelay: 1000,
     });
 
-    newSocket.on('connect', () => {
-      console.log('Socket connected:', newSocket.id);
+    newSocket.on("connect", () => {
+      console.log("Socket connected:", newSocket.id);
       setSocket(newSocket);
     });
 
-    newSocket.on('disconnect', (reason) => {
-      console.log('Socket disconnected:', reason);
-      setSocket(null);
-    });
-
-    newSocket.on('connect_error', (err) => {
-      console.error('Socket connection error:', err.message);
-      if (err.message.includes("Authentication error")) {
-        console.error("Authentication failed. Please log in again.");
-      }
+    newSocket.on("disconnect", (reason) => {
+      console.log("Socket disconnected:", reason);
       setSocket(null);
     });
 
     return () => {
-      newSocket.off('connect');
-      newSocket.off('disconnect');
-      newSocket.off('connect_error');
       newSocket.disconnect();
       setSocket(null);
     };
