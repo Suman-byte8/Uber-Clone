@@ -9,7 +9,8 @@ const pfp = "/3464ad1c33c983b87d66f14b092f11ee.jpg";
 import { Link } from "react-router-dom";
 import UserContext, { useUserContext } from "../../context/UserContext";
 import axios from "axios";
-
+import RideRequestPanel from "../../components/RideRequestPanel";
+import Footer from "../captain/Footer"
 import { useSocket } from "../../context/SocketContext";
 import {
   updateLocation,
@@ -22,7 +23,8 @@ import {
 import { onNewRideRequest } from "../../socket/listeners";
 import { useToast } from "../../context/ToastContext";
 import CancellationModal from "../../components/CancellationModal"; // Import CancellationModal
-import RideHistory from "../../components/RideHistory"; // Import RideHistory
+import RideHistory from "./RideHistory"; // Import RideHistory
+import Settings from "./Settings";
 
 const CaptainHome = () => {
   const [isDriverOnline, setIsDriverOnline] = useState(false);
@@ -31,8 +33,10 @@ const CaptainHome = () => {
   const [mapInstance, setMapInstance] = useState(null);
   const [incomingRide, setIncomingRide] = useState(null);
   const [currentRide, setCurrentRide] = useState(null);
-  const [riderDetails, setRiderDetails] = useState(null);
+  const [rideHistory, setRideHistory] = useState([]);
   const [showRideModal, setShowRideModal] = useState(false);
+  const [showHistoryPage, setShowHistoryPage] = useState(false);
+  const [riderDetails, setRiderDetails] = useState(null);
   const [showDriverCancelConfirmModal, setShowDriverCancelConfirmModal] = useState(false); // For driver's own cancellation confirmation
   const [cancelReason, setCancelReason] = useState("");
   const [showRejectedModal, setShowRejectedModal] = useState(false);
@@ -42,8 +46,6 @@ const CaptainHome = () => {
   const [showRiderProfile, setShowRiderProfile] = useState(false);
   const [cancelAllowed, setCancelAllowed] = useState(true);
   const [timeLeft, setTimeLeft] = useState(10); // 10-second timer
-  const [rideHistory, setRideHistory] = useState([]); // Store ride history
-  const [showHistoryPage, setShowHistoryPage] = useState(false); // Toggle history page
   const { captainId: contextCaptainId } = useUserContext();
   const captainId = localStorage.getItem("captainId") || contextCaptainId; // Use the ID from context if available;
   const token = localStorage.getItem("token");
@@ -419,35 +421,15 @@ const CaptainHome = () => {
       }, 1000);
 
       return () => clearInterval(timer); // Cleanup timer on unmount
-    } else {
+    } else if (!currentRide) {
+      // Reset timer when no ride is active
       setCancelAllowed(true);
-      setTimeLeft(10); // Reset timer when no ride is active
+      setTimeLeft(10);
     }
-  }, [currentRide, cancelAllowed]);
+  }, [currentRide]);
 
   const handleAcceptRide = () => {
     if (!incomingRide) return;
-
-    console.log("Accepting ride:", incomingRide);
-    console.log("Current rider details:", riderDetails);
-
-    // Ensure we have rider details before accepting
-    if (!riderDetails) {
-      fetch(`${import.meta.env.VITE_BASE_URL}/api/user/${incomingRide.userId}`)
-        .then((res) => res.json())
-        .then((response) => {
-          console.log("Fetched rider details:", response);
-          if (response.success) {
-            setRiderDetails({
-              id: incomingRide.userId,
-              ...response.data,
-            });
-          }
-        })
-        .catch((err) => {
-          console.error("Error fetching rider details:", err);
-        });
-    }
 
     acceptRide(socket, {
       rideId: incomingRide.rideId,
@@ -458,28 +440,22 @@ const CaptainHome = () => {
             lng: driverLocation.lon,
           }
         : null,
-      estimatedArrival: 5, // example ETA in minutes
+      estimatedArrival: 5, // Example ETA in minutes
     });
 
-    // Add ride details to history
-    setRideHistory((prevHistory) => [
-      ...prevHistory,
-      {
-        time: Date.now(),
-        fare: incomingRide.price,
-        destination: incomingRide.dropoffLocation.address,
-      },
-    ]);
+    // Ensure incomingRide has all required properties before setting it as currentRide
+    if (
+      incomingRide.pickupLocation &&
+      incomingRide.dropoffLocation &&
+      incomingRide.price
+    ) {
+      setCurrentRide(incomingRide);
+    } else {
+      console.error("Incoming ride is missing required properties:", incomingRide);
+    }
 
-    // Set as current ride
-    setCurrentRide(incomingRide);
-
-    // Close the modal
     setShowRideModal(false);
     setIncomingRide(null);
-
-    setShowRiderProfile(true);
-
     showToast("Ride accepted successfully", "success");
   };
 
@@ -538,6 +514,7 @@ const CaptainHome = () => {
 
   const handleCompassClick = () => {
     setActiveIcon("compass");
+    setShowHistoryPage(false); // Hide history page when compass is clicked
     if (mapInstance && driverLocation) {
       mapInstance.setView([driverLocation.lat, driverLocation.lon], 15);
       console.log("Map recentered to:", driverLocation);
@@ -597,285 +574,104 @@ const CaptainHome = () => {
   };
 
   return (
-    <div className="w-full max-h-screen bg-gray-100">
+    <div className="w-full max-h-screen bg-gray-100 relative">
       {showHistoryPage ? (
         <RideHistory
           rides={rideHistory}
-          onBack={() => setShowHistoryPage(false)} // Go back to home
+          onBack={() => setShowHistoryPage(false)}
         />
       ) : (
         <>
-          {/* Existing CaptainHome content */}
           <nav className="fixed top-0 w-full p-3 py-2 flex items-center justify-between z-10 bg-white shadow-md">
-            <Link
-              to="profile"
-              className="_profilePicture flex items-center justify-center"
-            >
-              <img
-                src={pfp}
-                alt="Profile"
-                className="w-12 h-12 rounded-full bg-gray-200"
-              />
+            <Link to="/captain-profile" className="_profilePicture flex items-center justify-center">
+              <img src={pfp} alt="Profile" className="w-12 h-12 rounded-full bg-gray-200" />
             </Link>
-
             <Switcher12 />
-
             <div className="bg-white w-10 h-10 rounded-full flex items-center justify-center shadow-md">
               <CiSearch />
             </div>
           </nav>
 
-          {/* Main content area */}
-          <div className="pt-16 pb-20">
-            <LivePosition location={driverLocation} onMapReady={handleMapReady} />
+          {/* Main Content */}
+          <div className="pt-16 pb-20 _mainContent">
+            {activeIcon === "compass" && (
+              <>
+                <LivePosition location={driverLocation} onMapReady={handleMapReady} />
+                {incomingRide && (
+                  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+                      <RideRequestPanel
+                        ride={incomingRide}
+                        onAccept={handleAcceptRide}
+                        onReject={handleRejectRide}
+                      />
+                    </div>
+                  </div>
+                )}
+                {showDriverCancelConfirmModal && (
+                  <CancellationModal
+                    isOpen={showDriverCancelConfirmModal}
+                    onClose={() => setShowDriverCancelConfirmModal(false)}
+                    cancelledBy="driver"
+                    isDriver={true}
+                  />
+                )}
+              </>
+            )}
+            {activeIcon === "trend" && <RideHistory />}
+            {activeIcon === "settings" && <Settings />}
           </div>
 
-          {/* Ride request modal */}
           {showRideModal && incomingRide && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
               <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
-                <h2 className="text-xl font-bold mb-4">New Ride Request</h2>
-
-                {/* Rider details */}
-                <div className="mb-4">
-                  <h3 className="font-semibold">Rider Details:</h3>
-                  <p>{riderDetails?.name || "Customer"}</p>
-                  <p>{riderDetails?.phoneNumber || ""}</p>
-                  <div className="flex items-center mt-1">
-                    <div className="text-yellow-500 mr-1">★</div>
-                    <span>{riderDetails?.rating || "4.5"}</span>
-                  </div>
-                </div>
-
-                {/* Trip details */}
-                <div className="mb-4">
-                  <h3 className="font-semibold">Trip Details:</h3>
-                  <div className="flex items-start mt-2">
-                    <div className="min-w-[24px] mr-2">
-                      <div className="w-3 h-3 rounded-full bg-green-500 mx-auto"></div>
-                      <div className="w-0.5 h-10 bg-gray-300 mx-auto"></div>
-                      <div className="w-3 h-3 rounded-full bg-red-500 mx-auto"></div>
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm mb-2 line-clamp-1">
-                        {incomingRide.pickupLocation.address || "Pickup location"}
-                      </p>
-                      <p className="text-sm line-clamp-1">
-                        {incomingRide.dropoffLocation.address || "Dropoff location"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Fare and distance */}
-                <div className="flex justify-between mb-6">
-                  <div>
-                    <h3 className="font-semibold">Estimated Fare:</h3>
-                    <p className="text-lg">₹{incomingRide.price || "0"}</p>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">Distance:</h3>
-                    <p className="text-lg">
-                      {Math.round(incomingRide.distance || 0)} km
-                    </p>
-                  </div>
-                </div>
-
-                {/* Action buttons */}
-                <div className="flex justify-between">
-                  <button
-                    onClick={handleRejectRide}
-                    className="px-4 py-2 bg-gray-500 text-white rounded-lg w-[48%]"
-                  >
-                    Reject
-                  </button>
-                  <button
-                    onClick={handleAcceptRide}
-                    className="px-4 py-2 bg-blue-500 text-white rounded-lg w-[48%]"
-                  >
-                    Accept
-                  </button>
-                </div>
+                <RideRequestPanel
+                  ride={incomingRide}
+                  onAccept={handleAcceptRide}
+                  onReject={handleRejectRide}
+                  socket={socket}
+                  captainId={captainId}
+                />
               </div>
             </div>
           )}
 
-          {/* Current ride info */}
-          {currentRide && (
+          {currentRide && currentRide.pickupLocation && currentRide.dropoffLocation ? (
             <div className="fixed bottom-20 left-0 right-0 bg-white shadow-lg rounded-t-lg p-4 z-20">
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="font-bold">Current Ride</h3>
-                <button
-                  onClick={() => setShowDriverCancelConfirmModal(true)}
-                  disabled={!cancelAllowed} // Disable button after 10 seconds
-                  className={`text-sm ${cancelAllowed ? "text-red-500" : "text-gray-400 cursor-not-allowed"}`}
-                >
-                  Cancel Ride {cancelAllowed && `(${timeLeft}s)`} {/* Show timer */}
-                </button>
-              </div>
-
-              <div className="flex items-start">
-                <div className="min-w-[24px] mr-2">
-                  <div className="w-3 h-3 rounded-full bg-green-500 mx-auto"></div>
-                  <div className="w-0.5 h-10 bg-gray-300 mx-auto"></div>
-                  <div className="w-3 h-3 rounded-full bg-red-500 mx-auto"></div>
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm mb-2 line-clamp-1">
-                    {currentRide.pickupLocation.address || "Pickup location"}
-                  </p>
-                  <p className="text-sm line-clamp-1">
-                    {currentRide.dropoffLocation.address || "Dropoff location"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex justify-between mt-2">
-                <div>
-                  <span className="text-sm text-gray-600">Fare:</span>
-                  <span className="font-semibold ml-1">
-                    ₹{currentRide.price || "0"}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-sm text-gray-600">Distance:</span>
-                  <span className="font-semibold ml-1">
-                  {Math.round(currentRide.distance || 0)} km
-                  </span>
-                </div>
-              </div>
+              <h3 className="text-lg font-bold mb-2">Current Ride</h3>
+              <p className="text-sm mb-2 line-clamp-1">
+                <strong>Pick-up:</strong> {currentRide.pickupLocation.address || "Pickup location not available"}
+              </p>
+              <p className="text-sm mb-2 line-clamp-1">
+                <strong>Drop-off:</strong> {currentRide.dropoffLocation.address || "Drop-off location not available"}
+              </p>
+              <p>
+                <strong>Fare:</strong> ₹{currentRide.price || 0}
+              </p>
+              <button
+                onClick={handleCancelRide}
+                className={`mt-4 p-2 rounded-lg ${
+                  cancelAllowed ? "bg-red-500 text-white" : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                }`}
+                disabled={!cancelAllowed} // Disable button after 10 seconds
+              >
+                {cancelAllowed
+                  ? `Cancel Ride (${timeLeft}s)` // Show countdown timer
+                  : "Cancel Disabled"}
+              </button>
             </div>
+          ) : (
+            <p className="text-center text-gray-500">No active ride</p>
           )}
-
-          {/* Driver's confirmation modal for cancelling a ride */}
-          {showDriverCancelConfirmModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-30">
-              <div className="bg-white p-4 rounded-lg shadow-lg">
-                <h3 className="text-lg font-bold mb-2">Cancel Ride</h3>
-                <p className="text-sm text-gray-600 mb-4">
-                  Are you sure you want to cancel this ride?
-                </p>
-                <div className="flex justify-end gap-2">
-                  <button
-                    onClick={() => setShowDriverCancelConfirmModal(false)} // Close modal
-                    className="px-4 py-2 bg-gray-200 rounded-lg text-sm"
-                  >
-                    No
-                  </button>
-                  <button
-                    onClick={() => {
-                      handleCancelRide(); // Call the cancel ride function
-                      setShowDriverCancelConfirmModal(false); // Close modal
-                    }}
-                    className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm"
-                  >
-                    Yes, Cancel
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Generic "Ride Cancelled by X" Modal */}
-          {showCancellationPopup && (
-            <CancellationModal
-              isOpen={showCancellationPopup}
-              onClose={() => setShowCancellationPopup(false)}
-              cancelledBy={cancellationPopupInitiator}
-              isDriver={true} />
-              
-          )}
-
-          {/* User rejected modal */}
-          {showRejectedModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white p-6 rounded-lg max-w-md w-full">
-                <h3 className="text-xl font-bold mb-4">Ride Rejected</h3>
-                <p className="mb-4">{rejectedMessage}</p>
-                <button
-                  className="w-full bg-black text-white py-2 rounded-lg"
-                  onClick={() => setShowRejectedModal(false)}
-                >
-                  OK
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Rider profile modal */}
-          {showRiderProfile && riderDetails && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              {console.log("Rendering rider profile modal:", riderDetails)}
-              <div className="bg-white rounded-lg shadow-lg p-6 w-[90vw] max-w-sm">
-                <h2 className="text-xl font-semibold mb-4 text-center">
-                  Rider Profile
-                </h2>
-                <div className="flex flex-col items-center mb-4">
-                  <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center text-2xl mb-2">
-                    {riderDetails.name
-                      ? riderDetails.name.charAt(0).toUpperCase()
-                      : "R"}
-                  </div>
-                  <p className="font-medium text-lg">
-                    {riderDetails.name || "Rider"}
-                  </p>
-                  <div className="flex items-center text-yellow-500 mt-1">
-                    ★ <span className="ml-1">{riderDetails.rating || "4.5"}</span>
-                  </div>
-                  <div className="mt-2 text-center">
-                    <p className="text-sm text-gray-600">
-                      {riderDetails.phoneNumber
-                        ? `Phone: ${riderDetails.phoneNumber}`
-                        : "Phone number not available"}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowRiderProfile(false)}
-                  className="w-full py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          )}
-
-          <footer className="fixed bottom-0 w-full flex items-center justify-between p-4 bg-white z-10">
-            <button
-              onClick={handleCompassClick}
-              className={`w-10 h-10 rounded-full flex items-center justify-center shadow-md transition-all duration-200 ${
-                activeIcon === "compass"
-                  ? "bg-blue-500 text-white text-xl"
-                  : "bg-white text-gray-500 text-lg"
-              }`}
-            >
-              <CiCompass1 />
-            </button>
-
-            <button
-              onClick={() => setShowHistoryPage(true)} // Show history page
-              className={`w-10 h-10 rounded-full flex items-center justify-center shadow-md transition-all duration-200 ${
-                activeIcon === "trend"
-                  ? "bg-blue-500 text-white text-xl"
-                  : "bg-white text-gray-500 text-lg"
-              }`}
-            >
-              <FaHistory />
-            </button>
-
-            <button
-              onClick={() => setActiveIcon("settings")}
-              className={`w-10 h-10 rounded-full flex items-center justify-center shadow-md transition-all duration-200 ${
-                activeIcon === "settings"
-                  ? "bg-blue-500 text-white text-xl"
-                  : "bg-white text-gray-500 text-lg"
-              }`}
-            >
-              <CiSettings />
-            </button>
-          </footer>
         </>
       )}
+
+      <Footer 
+        activeIcon={activeIcon} 
+        setActiveIcon={setActiveIcon} 
+        handleCompassClick={handleCompassClick}
+        setShowHistoryPage={setShowHistoryPage}
+      />
     </div>
   );
 };

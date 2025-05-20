@@ -104,10 +104,10 @@ const DriverDetailsPanel = ({ driver, onCancel, onBack, cancelAllowed = true }) 
         </div>
       )}
 
-      {/* TODO: Add map view here showing driver location */}
+      {/* TODO: Add map view here showing driver location
       <div className="flex-grow flex items-center justify-center text-gray-400 bg-gray-50 rounded my-4">
         Map Placeholder
-      </div>
+      </div> */}
 
       <div className="flex gap-3 mt-auto mb-2">
         <button
