@@ -476,33 +476,32 @@ const CaptainHome = () => {
   const handleCancelRide = () => {
     if (!socket || !currentRide) return;
 
-    // Emit the rideCancelled event
-    socket.emit("rideCancelled", {
-      rideId: currentRide.rideId,
-      cancelledBy: "driver", // Specify that the driver canceled the ride
-    });
-
-    console.log("Ride cancelled by driver");
-
-    // Reset the driver view
-    setCurrentRide(null); // Clear the current ride details
-    setIncomingRide(null); // Clear any incoming ride details
-    setShowRideModal(false); // Close any open ride modal
-    showToast("You have canceled the ride", "error"); // Optional: Show a toast notification
+    // Show confirmation modal first
+    setShowDriverCancelConfirmModal(true);
   };
 
-  const handleMapReady = useCallback(
-    (map) => {
-      console.log("Map is ready:", map);
-      setMapInstance(map);
+  // Add new function to handle actual cancellation
+  const confirmCancelRide = () => {
+    if (!socket || !currentRide) return;
 
-      // If we already have a location, center the map
-      if (driverLocation) {
-        map.setView([driverLocation.lat, driverLocation.lon], 15);
-      }
-    },
-    [driverLocation]
-  );
+    cancelRide(socket, {
+      rideId: currentRide.rideId,
+      cancelledBy: 'driver',
+      reason: cancelReason || 'Driver cancelled the ride'
+    });
+
+    // Close the confirmation modal
+    setShowDriverCancelConfirmModal(false);
+    
+    // Show the cancellation notification modal
+    setShowCancellationPopup(true);
+    setCancellationPopupInitiator('driver');
+
+    // Reset states
+    setCurrentRide(null);
+    setIncomingRide(null);
+    setShowRideModal(false);
+  };
 
   // Update map view when driver location changes
   useEffect(() => {
@@ -572,6 +571,17 @@ const CaptainHome = () => {
       setIsDriverOnline(!isDriverOnline);
     }
   };
+
+  // Add this function before the return statement, alongside other handler functions
+  const handleMapReady = useCallback((map) => {
+    console.log("Map instance ready:", map);
+    setMapInstance(map);
+    
+    // If we have driver location, center the map
+    if (driverLocation) {
+      map.setView([driverLocation.lat, driverLocation.lon], 15);
+    }
+  }, [driverLocation]);
 
   return (
     <div className="w-full max-h-screen bg-gray-100 relative">
@@ -662,6 +672,40 @@ const CaptainHome = () => {
             </div>
           ) : (
             <p className="text-center text-gray-500">No active ride</p>
+          )}
+
+          {/* Driver Cancel Confirmation Modal */}
+          <CancellationModal
+            isOpen={showDriverCancelConfirmModal}
+            onClose={() => setShowDriverCancelConfirmModal(false)}
+            onConfirm={confirmCancelRide}
+            cancelledBy="driver"
+            isDriver={true}
+          />
+
+          {/* Cancellation Notification Modal */}
+          <CancellationModal
+            isOpen={showCancellationPopup}
+            onClose={() => setShowCancellationPopup(false)}
+            cancelledBy={cancellationPopupInitiator}
+            isDriver={true}
+            isNotification={true}
+          />
+
+          {/* Rejected Ride Modal */}
+          {showRejectedModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+                <h3 className="text-xl font-bold mb-4">Ride Rejected</h3>
+                <p className="text-gray-600 mb-4">{rejectedMessage}</p>
+                <button
+                  onClick={() => setShowRejectedModal(false)}
+                  className="w-full bg-black text-white py-2 rounded-lg"
+                >
+                  OK
+                </button>
+              </div>
+            </div>
           )}
         </>
       )}
