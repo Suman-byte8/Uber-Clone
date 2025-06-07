@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useSocket } from "../context/SocketContext";
+import { useSocket } from "../../context/SocketContext";
 
 const DriverDetailsPanel = ({
   driver,
@@ -131,11 +131,15 @@ const DriverDetailsPanel = ({
         <button
           onClick={handleCancelRide}
           disabled={!cancelAllowed || cancellationExpired}
-          className="py-3 px-6 bg-gray-100 rounded-full font-medium disabled:opacity-50"
+          className="py-3 px-2 bg-gray-100 rounded-full font-medium disabled:opacity-50"
         >
-          Cancel ride
+          {cancelAllowed && !cancellationExpired ? (
+            `Cancel Ride (${timeLeft}s)`
+          ) : (
+            "Cancellation Expired"
+          )}
         </button>
-        <button className="py-3 px-6 bg-black text-white rounded-full font-medium">
+        <button className="py-3 px-2 bg-black text-white rounded-full font-medium">
           Track driver
         </button>
       </div>

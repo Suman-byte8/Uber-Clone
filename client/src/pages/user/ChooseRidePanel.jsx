@@ -2,10 +2,10 @@ import React, { useRef, useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import gsap from "gsap";
 // Import the hooks for socket and user context
-import { useSocket } from "../context/SocketContext";
-import { useUserContext } from "../context/UserContext";
-import NotificationModal from "./NotificationModal";
-import CancellationModal from "./CancellationModal"; // Import the correct modal
+import { useSocket } from "../../context/SocketContext";
+import { useUserContext } from "../../context/UserContext";
+import NotificationModal from "../../components/NotificationModal";
+import CancellationModal from "../../components/CancellationModal"; // Import the correct modal
 import DriverDetailsPanel from "./DriverDetailsPanel"; // Assuming this is a separate component
 
 // Assuming pricingTiers structure is like:
@@ -18,8 +18,8 @@ const ChooseRidePanel = ({
   prices,
   estimatedTime,
   pricingTiers,
-  pickupData, // Expecting { lat, lng }
-  dropoffData, // Expecting { lat, lng }
+  pickupData,
+  dropoffData,
 }) => {
   const contentRef = useRef(null);
   const panelRef = useRef(null);
@@ -33,6 +33,9 @@ const ChooseRidePanel = ({
   const [cancellationInfoSource, setCancellationInfoSource] = useState(null); // 'rider' or 'driver'
   const [cancelAllowed, setCancelAllowed] = useState(true);
   const [showNotification, setShowNotification] = useState(false);
+  const [showPanel, setShowPanel] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+
   useEffect(() => {
     console.log("showNotification state changed:", showNotification);
   }, [showNotification]);
@@ -47,9 +50,23 @@ const ChooseRidePanel = ({
 
   // --- Animation Effect (Keep as is) ---
   useEffect(() => {
-    if (!contentRef.current || !panelRef.current) return;
-    // ... your existing GSAP animation logic ...
-  }, [isVisible]);
+    if (!contentRef.current || !panelRef.current || !showPanel) return;
+
+    const panel = panelRef.current;
+    const content = contentRef.current;
+
+    gsap.set(content, { opacity: 0, y: 20 });
+
+    if (isVisible) {
+      gsap.to(content, {
+        opacity: 1,
+        y: 0,
+        duration: 0.4,
+        delay: 0.2,
+        ease: "power2.out",
+      });
+    }
+  }, [isVisible, showPanel]);
 
   // --- Socket Event Listeners ---
   useEffect(() => {
@@ -361,66 +378,66 @@ const ChooseRidePanel = ({
     }
   };
 
-  // Helper function to extract the best available address from location data
-  const extractAddressFromLocationData = (locationData) => {
-    // Log the full object to see what's available
-    console.log("Extracting address from:", locationData);
+  // // Helper function to extract the best available address from location data
+  // const extractAddressFromLocationData = (locationData) => {
+  //   // Log the full object to see what's available
+  //   console.log("Extracting address from:", locationData);
     
-    // Try different possible address fields
-    if (typeof locationData === 'object' && locationData !== null) {
-      // If it has a display_name property (common in OpenStreetMap responses)
-      if (locationData.display_name) {
-        return locationData.display_name;
-      }
+  //   // Try different possible address fields
+  //   if (typeof locationData === 'object' && locationData !== null) {
+  //     // If it has a display_name property (common in OpenStreetMap responses)
+  //     if (locationData.display_name) {
+  //       return locationData.display_name;
+  //     }
       
-      // If it has a formatted_address property (common in Google Maps responses)
-      if (locationData.formatted_address) {
-        return locationData.formatted_address;
-      }
+  //     // If it has a formatted_address property (common in Google Maps responses)
+  //     if (locationData.formatted_address) {
+  //       return locationData.formatted_address;
+  //     }
       
-      // If it has a name property
-      if (locationData.name) {
-        return locationData.name;
-      }
+  //     // If it has a name property
+  //     if (locationData.name) {
+  //       return locationData.name;
+  //     }
       
-      // If it has an address property that's a string
-      if (typeof locationData.address === 'string') {
-        return locationData.address;
-      }
+  //     // If it has an address property that's a string
+  //     if (typeof locationData.address === 'string') {
+  //       return locationData.address;
+  //     }
       
-      // If it has an address property that's an object (common in some APIs)
-      if (typeof locationData.address === 'object' && locationData.address !== null) {
-        const addressParts = [];
-        const address = locationData.address;
+  //     // If it has an address property that's an object (common in some APIs)
+  //     if (typeof locationData.address === 'object' && locationData.address !== null) {
+  //       const addressParts = [];
+  //       const address = locationData.address;
         
-        // Try to build an address from components
-        if (address.road) addressParts.push(address.road);
-        if (address.house_number) addressParts.push(address.house_number);
-        if (address.suburb) addressParts.push(address.suburb);
-        if (address.city || address.town) addressParts.push(address.city || address.town);
-        if (address.state) addressParts.push(address.state);
+  //       // Try to build an address from components
+  //       if (address.road) addressParts.push(address.road);
+  //       if (address.house_number) addressParts.push(address.house_number);
+  //       if (address.suburb) addressParts.push(address.suburb);
+  //       if (address.city || address.town) addressParts.push(address.city || address.town);
+  //       if (address.state) addressParts.push(address.state);
         
-        if (addressParts.length > 0) {
-          return addressParts.join(', ');
-        }
-      }
+  //       if (addressParts.length > 0) {
+  //         return addressParts.join(', ');
+  //       }
+  //     }
       
-      // If it has a place_name property (common in Mapbox responses)
-      if (locationData.place_name) {
-        return locationData.place_name;
-      }
-    }
+  //     // If it has a place_name property (common in Mapbox responses)
+  //     if (locationData.place_name) {
+  //       return locationData.place_name;
+  //     }
+  //   }
     
-    // If we have lat/lng, create a simple address format
-    if (locationData.lat && (locationData.lng || locationData.lon)) {
-      const lat = locationData.lat;
-      const lng = locationData.lng || locationData.lon;
-      return `Location at ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-    }
+  //   // If we have lat/lng, create a simple address format
+  //   if (locationData.lat && (locationData.lng || locationData.lon)) {
+  //     const lat = locationData.lat;
+  //     const lng = locationData.lng || locationData.lon;
+  //     return `Location at ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+  //   }
     
-    // Fallback
-    return "Location details unavailable";
-  };
+  //   // Fallback
+  //   return "Location details unavailable";
+  // };
 
   // --- Back Button Logic ---
   const handleBack = () => {
@@ -438,162 +455,185 @@ const ChooseRidePanel = ({
     onBack(); // Call the original onBack prop
   };
 
+  // Add this useEffect for the delayed render
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowPanel(true);
+    }, 10000); // 10 seconds delay
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Update the LoadingScreen component
+  const LoadingScreen = () => (
+    <div className="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center">
+      <div className="w-16 h-16 border-4 border-gray-200 border-t-black rounded-full animate-spin mb-4"></div>
+      <span className="text-xl font-medium text-gray-600 mb-2">
+        Preparing your ride options...
+      </span>
+
+    </div>
+  );
+
   return (
     <>
-      <NotificationModal
-        open={showNotification}
-        title={notificationTitle}
-        message={notificationMessage}
-        onClose={() => setShowNotification(false)}
-      />
-      {/* This is the modal that shows who cancelled the ride */}
-      <CancellationModal
-        isOpen={showCancellationInfoModal}
-        onClose={() => {
-          setShowCancellationInfoModal(false);
-          // Reset panel to initial state, similar to parts of handleBack
-          setBookingState("INITIAL");
-          setErrorMessage("");
-          setCaptainDetails(null);
-          setCurrentRideId(null);
-          // Optionally call onBack() if you want to navigate away completely
-          // onBack(); 
-        }}
-        cancelledBy={cancellationInfoSource}
-        isDriver={false} // This is the rider's view
-      />
-      <div
-        ref={panelRef}
-        className={`fixed inset-0 bg-white z-50 transition-transform duration-500 ease-out ${isVisible ? "translate-y-0" : "translate-y-full"
-          }`}
-      >
-        {/* Show Driver Details Panel if ride is accepted */}
-        {bookingState === "ACCEPTED" && captainDetails ? (
-          <DriverDetailsPanel
-            driver={captainDetails}
-            onCancel={handleUserCancel}
-            onBack={handleBack} // Allow going back from driver details
-            cancelAllowed={cancelAllowed}
+      {!showPanel ? (
+        <LoadingScreen />
+      ) : (
+        <>
+          <NotificationModal
+            open={showNotification}
+            title={notificationTitle}
+            message={notificationMessage}
+            onClose={() => setShowNotification(false)}
           />
-        ) : (
-          /* Show Ride Selection / Searching Panel */
-          <div ref={contentRef} className="p-4 h-full flex flex-col">
-            <button
-              onClick={handleBack} // Use the modified back handler
-              className="flex items-center text-gray-600 mb-4 hover:text-gray-800"
-            >
-              <i className="ri-arrow-left-line text-2xl mr-2"></i>
-              Back
-            </button>
-
-            {isLoading ? (
-              <div className="flex-grow flex flex-col items-center justify-center text-center">
-                <span className="text-xl font-medium text-gray-600 mb-2">
-                  Calculating route...
-                </span>
-                <span className="text-sm text-gray-500">
-                  Please wait a moment
-                </span>
-              </div>
+          <CancellationModal
+            isOpen={showCancellationInfoModal}
+            onClose={() => {
+              setShowCancellationInfoModal(false);
+              setBookingState("INITIAL");
+              setErrorMessage("");
+              setCaptainDetails(null);
+              setCurrentRideId(null);
+            }}
+            cancelledBy={cancellationInfoSource}
+            isDriver={false}
+          />
+          <div
+            ref={panelRef}
+            className={`fixed inset-0 bg-white z-50 transition-transform duration-500 ease-out ${
+              isVisible ? "translate-y-0" : "translate-y-full"
+            }`}
+          >
+            {/* Show Driver Details Panel if ride is accepted */}
+            {bookingState === "ACCEPTED" && captainDetails ? (
+              <DriverDetailsPanel
+                driver={captainDetails}
+                onCancel={handleUserCancel}
+                onBack={handleBack} // Allow going back from driver details
+                cancelAllowed={cancelAllowed}
+              />
             ) : (
-              <div className="flex-grow flex flex-col">
-                <div className="bg-gray-100 p-3 rounded-lg mb-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Distance:</span>
-                    <span className="font-medium">{distance?.toFixed(1)} km</span>
-                  </div>
-                  <div className="flex justify-between items-center mt-1">
-                    <span className="text-gray-600">Est. Time:</span>
-                    <span className="font-medium">
-                      {formatTime(estimatedTime)}
+              /* Show Ride Selection / Searching Panel */
+              <div ref={contentRef} className="p-4 h-full flex flex-col">
+                <button
+                  onClick={handleBack} // Use the modified back handler
+                  className="flex items-center text-gray-600 mb-4 hover:text-gray-800"
+                >
+                  <i className="ri-arrow-left-line text-2xl mr-2"></i>
+                  Back
+                </button>
+
+                {isLoading ? (
+                  <div className="flex-grow flex flex-col items-center justify-center text-center">
+                    <span className="text-xl font-medium text-gray-600 mb-2">
+                      Calculating route...
+                    </span>
+                    <span className="text-sm text-gray-500">
+                      Please wait a moment
                     </span>
                   </div>
-                </div>
+                ) : (
+                  <div className="flex-grow flex flex-col">
+                    <div className="bg-gray-100 p-3 rounded-lg mb-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600">Distance:</span>
+                        <span className="font-medium">{distance?.toFixed(1)} km</span>
+                      </div>
+                      <div className="flex justify-between items-center mt-1">
+                        <span className="text-gray-600">Est. Time:</span>
+                        <span className="font-medium">
+                          {formatTime(estimatedTime)}
+                        </span>
+                      </div>
+                    </div>
 
-                <div className="_rides w-full px-2 flex-grow overflow-y-auto">
-                  {["car", "auto", "motorcycle"].map(
-                    (type) =>
-                      prices[type] &&
-                      pricingTiers[type] && ( // Ensure price and tier data exists
-                        <div
-                          key={type}
-                          onClick={() =>
-                            bookingState !== "SEARCHING" && setSelectedRide(type)
-                          } // Allow selection only if not searching
-                          className={`flex items-center justify-between border-b py-3 transition-all duration-300 ${selectedRide === type
-                              ? "bg-gray-200 shadow-inner px-2 rounded"
-                              : "hover:bg-gray-100 px-2"
-                            } ${bookingState === "SEARCHING"
-                              ? "opacity-50 cursor-not-allowed"
-                              : "cursor-pointer"
-                            }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <img
-                              src={
-                                type === "car"
-                                  ? "https://i.pinimg.com/736x/8d/21/7b/8d217b1000b642005fea7b6fd6c3d967.jpg" // Use relative paths from public folder
-                                  : type === "auto"
-                                    ? "https://www.uber-assets.com/image/upload/f_auto,q_auto:eco,c_fill,h_368,w_552/v1648431773/assets/1d/db8c56-0204-4ce4-81ce-56a11a07fe98/original/Uber_Auto_558x372_pixels_Desktop.png"
-                                    : "https://www.uber-assets.com/image/upload/f_auto,q_auto:eco,c_fill,h_368,w_552/v1648177797/assets/fc/ddecaa-2eee-48fe-87f0-614aa7cee7d3/original/Uber_Moto_312x208_pixels_Mobile.png"
-                              }
-                              alt={`${type} icon`}
-                              className="w-16 h-auto object-contain" // Adjusted size
-                            />
-                            <div>
-                              <h4 className="text-lg font-semibold flex items-center gap-1">
-                                {pricingTiers[type].name}
-                                <i className="ri-user-fill text-xs font-normal"></i>
-                                <span className="text-xs font-normal">
-                                  {pricingTiers[type].maxPassengers}
-                                </span>
-                              </h4>
-                              <p className="text-xs text-gray-600">
-                                {getEstimatedArrivalTime()} arrival
-                              </p>
+                    <div className="_rides w-full px-2 flex-grow overflow-y-auto">
+                      {["car", "auto", "motorcycle"].map(
+                        (type) =>
+                          prices[type] &&
+                          pricingTiers[type] && ( // Ensure price and tier data exists
+                            <div
+                              key={type}
+                              onClick={() =>
+                                bookingState !== "SEARCHING" && setSelectedRide(type)
+                              } // Allow selection only if not searching
+                              className={`flex items-center justify-between border-b py-3 transition-all duration-300 ${selectedRide === type
+                                  ? "bg-gray-200 shadow-inner px-2 rounded"
+                                  : "hover:bg-gray-100 px-2"
+                                } ${bookingState === "SEARCHING"
+                                  ? "opacity-50 cursor-not-allowed"
+                                  : "cursor-pointer"
+                                }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <img
+                                  src={
+                                    type === "car"
+                                      ? "https://i.pinimg.com/736x/8d/21/7b/8d217b1000b642005fea7b6fd6c3d967.jpg" // Use relative paths from public folder
+                                      : type === "auto"
+                                        ? "https://www.uber-assets.com/image/upload/f_auto,q_auto:eco,c_fill,h_368,w_552/v1648431773/assets/1d/db8c56-0204-4ce4-81ce-56a11a07fe98/original/Uber_Auto_558x372_pixels_Desktop.png"
+                                        : "https://www.uber-assets.com/image/upload/f_auto,q_auto:eco,c_fill,h_368,w_552/v1648177797/assets/fc/ddecaa-2eee-48fe-87f0-614aa7cee7d3/original/Uber_Moto_312x208_pixels_Mobile.png"
+                                  }
+                                  alt={`${type} icon`}
+                                  className="w-16 h-auto object-contain" // Adjusted size
+                                />
+                                <div>
+                                  <h4 className="text-lg font-semibold flex items-center gap-1">
+                                    {pricingTiers[type].name}
+                                    <i className="ri-user-fill text-xs font-normal"></i>
+                                    <span className="text-xs font-normal">
+                                      {pricingTiers[type].maxPassengers}
+                                    </span>
+                                  </h4>
+                                  <p className="text-xs text-gray-600">
+                                    {getEstimatedArrivalTime()} arrival
+                                  </p>
+                                </div>
+                              </div>
+                              <h2 className="text-lg font-medium">₹{prices[type]}</h2>
                             </div>
-                          </div>
-                          <h2 className="text-lg font-medium">₹{prices[type]}</h2>
-                        </div>
-                      )
-                  )}
-                </div>
+                          )
+                      )}
+                    </div>
 
-                {/* Error Message Display */}
-                {errorMessage && (
-                  <div className="my-2 p-2 text-center text-red-600 bg-red-100 rounded">
-                    {errorMessage}
+                    {/* Error Message Display */}
+                    {errorMessage && (
+                      <div className="my-2 p-2 text-center text-red-600 bg-red-100 rounded">
+                        {errorMessage}
+                      </div>
+                    )}
+
+                    <button
+                      className={`w-full mt-auto mb-4 p-3 rounded-lg text-lg font-medium transition-colors duration-200 ${selectedRide &&
+                          (bookingState === "INITIAL" || bookingState === "FAILED")
+                          ? "bg-black text-white hover:bg-gray-800"
+                          : bookingState === "SEARCHING"
+                            ? "bg-yellow-500 text-black cursor-wait" // Indicate searching
+                            : bookingState === "FOUND"
+                              ? "bg-green-500 text-white cursor-pointer" // Indicate found
+                              : "bg-gray-300 text-gray-500 cursor-not-allowed" // Disabled state
+                        }`}
+                      disabled={!selectedRide || bookingState === "SEARCHING"}
+                      onClick={handleBookRide}
+                    >
+                      {bookingState === "INITIAL" &&
+                        `Book ${selectedRide ? pricingTiers[selectedRide]?.name : "a ride"
+                        }`}
+                      {bookingState === "SEARCHING" && "Finding your driver..."}
+                      {bookingState === "FOUND" && "Driver found!"}
+                      {bookingState === "FAILED" &&
+                        `Retry Booking ${selectedRide ? pricingTiers[selectedRide]?.name : ""
+                        }`}
+                      {/* Button text handled by showing DriverDetailsPanel when ACCEPTED */}
+                    </button>
                   </div>
                 )}
-
-                <button
-                  className={`w-full mt-auto mb-4 p-3 rounded-lg text-lg font-medium transition-colors duration-200 ${selectedRide &&
-                      (bookingState === "INITIAL" || bookingState === "FAILED")
-                      ? "bg-black text-white hover:bg-gray-800"
-                      : bookingState === "SEARCHING"
-                        ? "bg-yellow-500 text-black cursor-wait" // Indicate searching
-                        : bookingState === "FOUND"
-                          ? "bg-green-500 text-white cursor-pointer" // Indicate found
-                          : "bg-gray-300 text-gray-500 cursor-not-allowed" // Disabled state
-                    }`}
-                  disabled={!selectedRide || bookingState === "SEARCHING"}
-                  onClick={handleBookRide}
-                >
-                  {bookingState === "INITIAL" &&
-                    `Book ${selectedRide ? pricingTiers[selectedRide]?.name : "a ride"
-                    }`}
-                  {bookingState === "SEARCHING" && "Finding your driver..."}
-                  {bookingState === "FOUND" && "Driver found!"}
-                  {bookingState === "FAILED" &&
-                    `Retry Booking ${selectedRide ? pricingTiers[selectedRide]?.name : ""
-                    }`}
-                  {/* Button text handled by showing DriverDetailsPanel when ACCEPTED */}
-                </button>
               </div>
             )}
           </div>
-        )}
-      </div>
+        </>
+      )}
     </>
   );
 };

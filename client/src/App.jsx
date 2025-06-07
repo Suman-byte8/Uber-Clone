@@ -15,7 +15,7 @@ import CaptainLogin from "./pages/captain/CaptainLogin";
 import CaptainProfile from "./pages/captain/CaptainProfile";
 import UserAccount from "./pages/user/UserAccount";
 import UserLogin from "./pages/user/UserLogin";
-import ChooseRidePanel from "./components/ChooseRidePanel";
+import ChooseRidePanel from "./pages/user/ChooseRidePanel.jsx";
 import ProtectedRoute from "./components/ProtectedRoute";
 import CaptainProtectedWrapper from './components/CaptainProtectedWrapper';
 import RideHistory from "./pages/captain/RideHistory";

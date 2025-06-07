@@ -2,8 +2,8 @@ import React, { useRef, useState, useEffect, useCallback } from "react";
 import gsap from "gsap";
 import axios from "axios";
 import LivePosition from "../../components/LivePosition";
-import PickUpPanel from "../../components/PickUpPanel";
-import ChooseRidePanel from "../../components/ChooseRidePanel";
+import PickUpPanel from "./PickUpPanel";
+import ChooseRidePanel from "./ChooseRidePanel";
 import { useUserContext } from "../../context/UserContext";
 import { useSocket } from "../../context/SocketContext";
 
@@ -107,15 +107,32 @@ const TripPlan = () => {
     if (!panelState.isOpen) setPanelState((prev) => ({ ...prev, isOpen: true }));
   };
 
-  const handlePickupSearch = useCallback(debounce((query) => {
-    setPickupState((prev) => ({ ...prev, query }));
-    fetchSuggestions(query, setPickupState);
-  }, 300), []);
+  // Update the fetchSuggestions function to be debounced
+  const debouncedFetchSuggestions = useCallback(
+    debounce(async (query, setState) => {
+      if (!query.trim()) return;
+      setState((prev) => ({ ...prev, isLoading: true }));
+      try {
+        const response = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&q=${query}`);
+        setState((prev) => ({ ...prev, suggestions: response.data, isLoading: false }));
+      } catch (error) {
+        console.error("Error fetching suggestions:", error);
+        setState((prev) => ({ ...prev, isLoading: false, error: error.message }));
+      }
+    }, 600),
+    []
+  );
 
-  const handleDropoffSearch = useCallback(debounce((query) => {
+  // Update the handle search functions to directly update state and use debounced API call
+  const handlePickupSearch = useCallback((query) => {
+    setPickupState((prev) => ({ ...prev, query }));
+    debouncedFetchSuggestions(query, setPickupState);
+  }, [debouncedFetchSuggestions]);
+
+  const handleDropoffSearch = useCallback((query) => {
     setDropoffState((prev) => ({ ...prev, query }));
-    fetchSuggestions(query, setDropoffState);
-  }, 300), []);
+    debouncedFetchSuggestions(query, setDropoffState);
+  }, [debouncedFetchSuggestions]);
 
   // function to fetch and update user location
   // and address using OpenStreetMap Nominatim API
