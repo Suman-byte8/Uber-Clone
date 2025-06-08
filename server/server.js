@@ -27,18 +27,37 @@ const io = new Server(server, {
 
 // Socket.IO authentication middleware
 io.use((socket, next) => {
-  const token = socket.handshake.auth.token;
-  if (!token) {
+  const authHeader = socket.handshake.auth.token || 
+                    socket.handshake.headers.authorization;
+                    
+  if (!authHeader) {
     return next(new Error('Authentication error: No token provided'));
   }
+
   try {
+    // Clean the token string
+    const token = authHeader.replace('Bearer ', '').trim();
+    
+    // Add debug logging
+    console.log('Received token:', token);
+    
+    // Verify token
     const decoded = verifyToken(token);
+    if (!decoded) {
+      console.error('Token verification failed');
+      return next(new Error('Authentication error: Invalid token'));
+    }
+
+    // Attach user info to socket
     socket.userId = decoded.id;
     socket.role = decoded.role;
     next();
   } catch (err) {
-    console.error('Socket authentication error:', err);
-    next(new Error('Authentication error: Invalid token'));
+    console.error('Socket authentication error details:', {
+      error: err.message,
+      token: authHeader
+    });
+    return next(new Error('Authentication error: Invalid token'));
   }
 });
 

@@ -1,136 +1,126 @@
-// Example implementation for a ride details component
+import React from 'react';
 
-import React, { useState, useEffect } from 'react';
-import { cancelRide } from '../socket/emitters';
+const RideDetails = ({
+  isRidePanelExpanded,
+  setIsRidePanelExpanded,
+  currentRide,
+  handleCancelRide,
+  cancelAllowed,
+  timeLeft,
+  socket // Add socket prop
+}) => {
+  // Add cancel handler
+  const handleCancelClick = () => {
+    if (!cancelAllowed || !socket || !currentRide) return;
 
-const RideDetails = ({ socket, rideData }) => {
-  const [rideDetails, setRideDetails] = useState(null);
-  const [captainDetails, setCaptainDetails] = useState(null);
-  const [cancellationTimer, setCancellationTimer] = useState(null);
-  const [timeRemaining, setTimeRemaining] = useState(10);
-  const [isCancelButtonEnabled, setIsCancelButtonEnabled] = useState(false);
-  const [cancellationModalInfo, setCancellationModalInfo] = useState(null);
-  const [cancelledBy, setCancelledBy] = useState(null);
-
-  useEffect(() => {
-    if (!socket) return;
-
-    // Listen for ride acceptance with details
-    socket.on('rideAcceptedWithDetails', (data) => {
-      // Set ride and captain details instead of showing cancellation modal
-      setRideDetails(data);
-      setCaptainDetails(data.captainDetails);
-      startCancelCountdown(data.startCancellationTimer.expiresAt);
-    });
-    
-
-    // Listen for ride cancellation
-    socket.on('rideCancelledByUser', (data) => {
-      showCancellationModal(data.cancelledBy);
-      disableCancelButton();
+    // Emit cancellation event to server
+    socket.emit('rideCancelled', {
+      rideId: currentRide.rideId,
+      cancelledBy: 'driver',
+      reason: 'Driver cancelled the ride'
     });
 
-    // Listen for cancellation timeout
-    socket.on('rideCancellationTimeout', () => {
-      disableCancelButton();
-    });
-
-    socket.on('startCancellationTimer', (data) => {
-      startCancelCountdown(data.expiresAt);
-    });
-
-    return () => {
-      socket.off('rideAcceptedWithDetails');
-      socket.off('rideCancelledByUser');
-      socket.off('rideCancellationTimeout');
-      socket.off('startCancellationTimer');
-    };
-  }, [socket]);
-
-  const startCancelCountdown = (expiresAt) => {
-    setIsCancelButtonEnabled(true);
-    
-    const timer = setInterval(() => {
-      const remaining = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
-      setTimeRemaining(remaining);
-
-      if (remaining <= 0) {
-        clearInterval(timer);
-        disableCancelButton();
-        socket.emit('rideCancellationTimeout', { rideId: rideData.id });
-      }
-    }, 1000);
-
-    setCancellationTimer(timer);
+    // Call the parent's cancel handler
+    handleCancelRide();
   };
 
-  const handleCancelRide = () => {
-    if (!isCancelButtonEnabled) return;
-
-    const cancelledBy = 'rider';
-    socket.emit('cancelRide', {
-      rideId: rideData.id,
-      cancelledBy
-    });
-    showCancellationModal(cancelledBy);
-  };
-
-  const showCancellationModal = (cancelledBy) => {
-    setCancellationModalInfo({
-      cancelledBy,
-      message: cancelledBy === 'captain' ? 'Driver cancelled the ride' : 'Rider cancelled the ride'
-    });
-    
-    // Auto-close modal after 3 seconds
-    setTimeout(() => setCancellationModalInfo(null), 3000);
-  };
-
-  const disableCancelButton = () => {
-    setIsCancelButtonEnabled(false);
-    if (cancellationTimer) {
-      clearInterval(cancellationTimer);
-    }
-  };
-
-  // Render captain details if available
-  const renderCaptainDetails = () => {
-    if (!captainDetails) return null;
-
+  if (!currentRide || !currentRide.pickupLocation || !currentRide.dropoffLocation) {
     return (
-      <div className="captain-details">
-        <h3>Driver Details</h3>
-        <p>Name: {captainDetails.name}</p>
-        <p>Vehicle: {captainDetails.vehicle?.make} {captainDetails.vehicle?.model}</p>
-        <p>Rating: {captainDetails.rating}</p>
-        <p>Phone: {captainDetails.phoneNumber}</p>
+      <div className="fixed left-4 bottom-20 z-30">
+        <div className="bg-gray-100 text-gray-500 rounded-lg px-4 py-2 flex items-center gap-2">
+          <i className="ri-taxi-line" />
+          <span>No active ride</span>
+        </div>
       </div>
     );
-  };
+  }
 
   return (
-    <div>
-      {/* Captain Details Section */}
-      {renderCaptainDetails()}
+    <>
+      {/* Dropdown Header */}
+      {!isRidePanelExpanded && (
+        <div 
+          onClick={() => setIsRidePanelExpanded(!isRidePanelExpanded)}
+          className="fixed left-3 bottom-[8rem] z-30 flex items-center gap-2 bg-white rounded-lg shadow-md px-4 py-2 cursor-pointer hover:bg-gray-50 transition-all duration-300"
+        >
+          <div className={`flex items-center gap-2 ${isRidePanelExpanded ? 'text-blue-600' : 'text-gray-700'}`}>
+            <i className="ri-taxi-line text-lg" />
+            <span className="font-medium">Current Ride</span>
+          </div>
+          <i className={`ri-arrow-down-s-line text-xl transition-transform duration-300 ${
+            isRidePanelExpanded ? 'rotate-180 text-blue-600' : 'text-gray-500'
+          }`} />
+        </div>
+      )}
 
-      {/* Cancellation Button */}
-      {isCancelButtonEnabled && (
-        <div>
-          <button 
-            onClick={handleCancelRide}
-            disabled={!isCancelButtonEnabled}
+      {/* Expandable Panel */}
+      <div
+        className={`fixed left-0 right-0 bg-white shadow-lg transform transition-all duration-300 ease-in-out z-20 ${
+          isRidePanelExpanded 
+            ? 'translate-y-0 border-t border-gray-200' 
+            : 'translate-y-full'
+        }`}
+        style={{ bottom: '5rem' }}
+      >
+        {/* Panel Header */}
+        <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-gray-800">Ride Details</h3>
+          <button
+            onClick={() => setIsRidePanelExpanded(false)}
+            className="text-gray-500 hover:text-gray-700"
           >
-            Cancel Ride (Time Left: {timeRemaining}s)
+            <i className="ri-close-line text-xl" />
           </button>
         </div>
-      )}
 
-      {/* Cancellation Modal */}
-      {cancellationModalInfo && (
-        <div className="cancellation-modal">
-          {cancellationModalInfo.message}
+        {/* Panel Content */}
+        <div className="p-4 space-y-4">
+          {/* Pickup Location */}
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+              <i className="ri-map-pin-line text-green-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500 font-medium">Pickup Location</p>
+              <p className="text-gray-800">{currentRide.pickupLocation.address}</p>
+            </div>
+          </div>
+
+          {/* Dropoff Location */}
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+              <i className="ri-flag-line text-red-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500 font-medium">Drop-off Location</p>
+              <p className="text-gray-800">{currentRide.dropoffLocation.address}</p>
+            </div>
+          </div>
+
+          {/* Fare Info */}
+          <div className="bg-green-50 rounded-lg p-4 flex items-center justify-between">
+            <span className="text-gray-700 font-medium">Total Fare</span>
+            <span className="text-2xl font-bold text-green-600">
+              ₹{currentRide.price || 0}
+            </span>
+          </div>
+
+          {/* Cancel Button */}
+          <button
+            onClick={handleCancelClick}
+            disabled={!cancelAllowed}
+            className={`w-full py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-all duration-300 ${
+              cancelAllowed
+                ? 'bg-red-500 hover:bg-red-600 text-white'
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            }`}
+          >
+            <i className="ri-close-circle-line" />
+            {cancelAllowed ? `Cancel Ride (${timeLeft}s)` : 'Cancel Disabled'}
+          </button>
         </div>
-      )}
-    </div>
+      </div>
+    </>
   );
 };
 

@@ -2,36 +2,51 @@ import React, { useState } from "react";
 import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
 import { useUserContext } from "../../context/UserContext";
+import { useSocketActions } from "../../context/SocketContext";
 
 const CaptainLogin = () => {
-  const { login } = useUserContext(); // Change this line to get login function
+  const { login } = useUserContext();
+  const { connect } = useSocketActions();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setIsLoading(true);
 
     try {
       const response = await axios.post(
         `${import.meta.env.VITE_BASE_URL}/api/captain/login`,
-        {
-          email,
-          password,
-        }
+        { email, password }
       );
 
+      const { token, captain } = response.data;
+
+      // Store token without Bearer prefix
+      const cleanToken = token.replace("Bearer ", "").trim();
+
+      // Update context with captain info
+      login(captain, cleanToken, "captain");
+
+      // Initialize socket connection with the token
+      await connect(cleanToken);
+
       setSuccess("Login successful!");
-      const captainId = response.data.captain._id;
-      login(response.data.token, captainId, 'captain'); // Use the login function instead
-      console.log(captainId); // Add this line to log the captainId (for debugging purrr)
-      navigate("/captain-home");
+
+      // Navigate after successful connection
+      setTimeout(() => {
+        navigate("/captain-home");
+      }, 500);
     } catch (error) {
-      console.error("Error logging in:", error);
-      setError("Invalid email or password. Please try again.");
+      console.error("Login error:", error);
+      setError(error.response?.data?.message || "Invalid email or password");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -47,6 +62,7 @@ const CaptainLogin = () => {
             onChange={(e) => setEmail(e.target.value)}
             className="p-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition duration-200"
             required
+            disabled={isLoading}
           />
         </div>
         <div className="flex flex-col">
@@ -57,26 +73,30 @@ const CaptainLogin = () => {
             onChange={(e) => setPassword(e.target.value)}
             className="p-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition duration-200"
             required
+            disabled={isLoading}
           />
         </div>
-        {error && <p className="text-red-500">{error}</p>}{" "}
-        {/* Display error message */}
-        {success && <p className="text-green-500">{success}</p>}{" "}
-        {/* Display success message */}
+        {error && <p className="text-red-500 text-sm">{error}</p>}
+        {success && <p className="text-green-500 text-sm">{success}</p>}
         <button
           type="submit"
-          className="bg-black text-white p-4 rounded-xl mt-4 text-xl font-medium"
+          disabled={isLoading}
+          className={`bg-black text-white p-4 rounded-xl mt-4 text-xl font-medium transition-all duration-300 ${
+            isLoading ? "opacity-70 cursor-not-allowed" : "hover:bg-gray-800"
+          }`}
         >
-          Login
+          {isLoading ? "Logging in..." : "Login"}
         </button>
       </form>
 
       <p className="text-sm text-gray-600 mt-6 pb-3">
         Don't have an account?{" "}
-        <Link to="/captain-signup" className="text-blue-500">
+        <Link
+          to="/captain-signup"
+          className="text-blue-500 hover:text-blue-600"
+        >
           Sign up here
         </Link>
-        .
       </p>
 
       <p className="text-sm text-gray-600 mt-6 pb-3">

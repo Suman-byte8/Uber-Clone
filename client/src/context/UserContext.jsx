@@ -1,66 +1,77 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { SocketProvider } from './SocketContext';
 
 // Create a context for user and captain IDs
 const UserContext = createContext();
 
 // Create a provider component
 export const UserProvider = ({ children }) => {
-  const [userId, setUserId] = useState(localStorage.getItem('userId'));
-  const [captainId, setCaptainId] = useState(localStorage.getItem('captainId'));
-  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
+  const [user, setUser] = useState(null);
+  const [userId, setUserId] = useState(null);
+  const [captainId, setCaptainId] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const navigate = useNavigate();
-
-  const login = (token, id, role) => {
+  const login = (userData, token, role) => {
     localStorage.setItem('token', token);
-    if (role === 'user') {
-      localStorage.setItem('userId', id);
-      setUserId(id);
-      setCaptainId(null); // Clear captainId if logging in as user
-      localStorage.removeItem('captainId');
-    } else {
-      localStorage.setItem('captainId', id);
-      setCaptainId(id);
-      setUserId(null); // Clear userId if logging in as captain
-      localStorage.removeItem('userId');
-    }
+    setUser(userData);
     setIsAuthenticated(true);
+    
+    if (role === 'user') {
+      setUserId(userData._id || userData.id);
+      localStorage.setItem('userId', userData._id || userData.id);
+    } else if (role === 'captain') {
+      setCaptainId(userData._id || userData.id);
+      localStorage.setItem('captainId', userData._id || userData.id);
+    }
   };
 
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('userId');
     localStorage.removeItem('captainId');
+    setUser(null);
     setUserId(null);
     setCaptainId(null);
     setIsAuthenticated(false);
-    navigate("/"); // Navigate after cleanup
   };
 
   useEffect(() => {
-    // Check token on mount and set authentication state
+    // Check for stored authentication data
+    const storedUserId = localStorage.getItem('userId');
+    const storedCaptainId = localStorage.getItem('captainId');
     const token = localStorage.getItem('token');
+
     if (token) {
       setIsAuthenticated(true);
-      setUserId(localStorage.getItem('userId'));
-      setCaptainId(localStorage.getItem('captainId'));
-    } else {
-      logout();
+      if (storedUserId) {
+        setUserId(storedUserId);
+      }
+      if (storedCaptainId) {
+        setCaptainId(storedCaptainId);
+      }
     }
+    setLoading(false);
   }, []);
 
+  const value = {
+    user,
+    userId,
+    captainId,
+    isAuthenticated,
+    loading,
+    login,
+    logout,
+    setUser,
+    setUserId,
+    setCaptainId
+  };
+
   return (
-    <UserContext.Provider value={{
-      userId,
-      setUserId,
-      captainId,
-      setCaptainId,
-      isAuthenticated,
-      login,
-      logout,
-    }}>
-      {children}
+    <UserContext.Provider value={value}>
+      <SocketProvider>
+        {children}
+      </SocketProvider>
     </UserContext.Provider>
   );
 };

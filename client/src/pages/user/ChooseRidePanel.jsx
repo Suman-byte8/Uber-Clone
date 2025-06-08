@@ -2,10 +2,10 @@ import React, { useRef, useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import gsap from "gsap";
 // Import the hooks for socket and user context
-import { useSocket } from "../../context/SocketContext";
+import { useSocket, useSocketActions } from "../../context/SocketContext";
 import { useUserContext } from "../../context/UserContext";
-import NotificationModal from "../../components/NotificationModal";
-import CancellationModal from "../../components/CancellationModal"; // Import the correct modal
+import NotificationModal from "../../components/Modals/NotificationModal";
+import CancellationModal from "../../components/Modals/CancellationModal"; // Import the correct modal
 import DriverDetailsPanel from "./DriverDetailsPanel"; // Assuming this is a separate component
 
 // Assuming pricingTiers structure is like:
@@ -35,6 +35,7 @@ const ChooseRidePanel = ({
   const [showNotification, setShowNotification] = useState(false);
   const [showPanel, setShowPanel] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
+  const [showDriverCancelledModal, setShowDriverCancelledModal] = useState(false);
 
   useEffect(() => {
     console.log("showNotification state changed:", showNotification);
@@ -44,9 +45,25 @@ const ChooseRidePanel = ({
 
   // Get socket instance and user ID from context
   const socket = useSocket();
+  const { forceReconnectSocket, isConnected, reconnecting } = useSocketActions();
   const { userId } = useUserContext(); // Make sure UserContext provides userId
 
   const isLoading = !distance || !estimatedTime || !prices?.car; // Keep your loading logic
+
+  // Function to handle socket reconnection
+  const handleSocketReconnection = useCallback(async () => {
+    if (reconnecting) return; // Prevent multiple reconnection attempts
+    
+    console.log("Attempting to reconnect socket...");
+    
+    try {
+      await forceReconnectSocket();
+      console.log("Socket reconnected successfully");
+    } catch (error) {
+      console.error("Failed to reconnect socket:", error);
+      setErrorMessage("Connection lost. Please try again.");
+    }
+  }, [forceReconnectSocket, reconnecting]);
 
   // --- Animation Effect (Keep as is) ---
   useEffect(() => {
@@ -70,15 +87,15 @@ const ChooseRidePanel = ({
 
   // --- Socket Event Listeners ---
   useEffect(() => {
-    if (!socket) {
-      console.log("ChooseRidePanel: Socket not connected yet.");
+    if (!socket || !isConnected) {
+      console.log("ChooseRidePanel: Socket not connected yet. Connected:", isConnected);
       return; // Don't set up listeners if socket is not ready
     }
 
+    console.log("ChooseRidePanel: Setting up socket listeners with connected socket");
+
     // Register this user socket on server to receive ride events
     socket.emit("registerUser", { userId });
-
-    // console.log("ChooseRidePanel: Setting up socket listeners.");
 
     const handleRideAccepted = (data) => {
       console.log("Ride Accepted with full details:", JSON.stringify(data));
@@ -171,17 +188,29 @@ const ChooseRidePanel = ({
 
       if (data.rideId === currentRideId) {
         console.log("RIDER_VIEW (ChooseRidePanel): rideId matches currentRideId.");
+        
         if (data.cancelledBy === "driver") {
           console.log("Ride cancelled by driver (rider's view)");
+          
+          // Show notification modal for driver cancellation
           setNotificationTitle("Ride Cancelled");
-          setNotificationMessage("The driver has canceled the ride.");
-          setShowNotification(true); // Show toast or modal notification
+          setNotificationMessage("The Driver Cancelled the ride, Try again!");
+          setShowNotification(true);
+          
+          // Handle socket reconnection after showing notification
+          setTimeout(async () => {
+            console.log("Initiating socket reconnection after driver cancellation");
+            await handleSocketReconnection();
+          }, 2000); // Give time for notification to be seen
         }
+        
         setCancellationInfoSource(data.cancelledBy); // 'driver' or 'rider'
-        setShowCancellationInfoModal(true); // Show cancellation modal
-        setBookingState("INITIAL"); // Reset booking state
-        setCaptainDetails(null); // Clear captain details
-        setCurrentRideId(null); // Clear current ride ID
+        
+        // Reset all ride states
+        setBookingState("INITIAL");
+        setCaptainDetails(null);
+        setCurrentRideId(null);
+        setErrorMessage("");
       }
     };
 
@@ -206,7 +235,7 @@ const ChooseRidePanel = ({
       socket.off("rideCancelled", handleRideCancelled);
     };
     // Rerun this effect if the socket instance changes
-  }, [socket, currentRideId, bookingState, captainDetails, userId]); // Add dependencies that handlers rely on
+  }, [socket, currentRideId, bookingState, captainDetails, userId, handleSocketReconnection]); // Add dependencies that handlers rely on
 
   useEffect(() => {
     if (bookingState === "ACCEPTED") {

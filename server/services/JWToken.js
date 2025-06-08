@@ -13,7 +13,20 @@ const generateToken = (userId, role) => {
 };
 
 const verifyToken = (token) => {
-    return jwt.verify(token, process.env.JWT_SECRET);
+  try {
+    if (!token) return null;
+    
+    // Clean the token string
+    const cleanToken = token.replace('Bearer ', '').trim();
+    
+    // Add debug logging
+    console.log('Verifying token:', cleanToken);
+    
+    return jwt.verify(cleanToken, process.env.JWT_SECRET);
+  } catch (error) {
+    console.error('Token verification error:', error.message);
+    return null;
+  }
 };
 
 module.exports = { generateToken, verifyToken };

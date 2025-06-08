@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import CancellationModal from "./CancellationModal";
+import CancellationModal from "./Modals/CancellationModal";
 
 const RideRequestPanel = ({ ride, onAccept, onReject, socket, captainId }) => {
   const [showCancellationModal, setShowCancellationModal] = useState(false);
@@ -38,18 +38,22 @@ const RideRequestPanel = ({ ride, onAccept, onReject, socket, captainId }) => {
   }, [socket, ride.rideId]);
 
   const handleCancelRide = () => {
-    // Emit cancellation event
+    // Emit cancellation event with proper data structure
     socket.emit("cancelRide", {
       rideId: ride.rideId,
       captainId,
       userId: ride.userId, // Assuming ride object has userId
       cancelledBy: "driver",
       cancelTime: new Date().toISOString(),
+      reason: "Driver cancelled the ride"
     });
 
+    console.log("Driver cancelled ride:", ride.rideId);
+    
     // Show cancellation modal
     setCancelledBy("driver");
     setShowCancellationModal(true);
+    
     // After driver cancels, treat it as a rejection for this panel's state
     if (onReject) {
       onReject(); // Reset the panel or navigate back

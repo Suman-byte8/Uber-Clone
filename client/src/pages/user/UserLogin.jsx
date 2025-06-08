@@ -2,44 +2,52 @@ import React, { useState } from "react";
 import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
 import { useUserContext } from "../../context/UserContext";
+import { useSocketActions } from "../../context/SocketContext";
 
 const UserLogin = () => {
-    const { login } = useUserContext(); 
+    const { login } = useUserContext();
+    const { connect } = useSocketActions();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
     const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
+        setIsLoading(true);
 
         try {
-            const response = await axios.post(`${import.meta.env.VITE_BASE_URL}/api/user/login`, {
-                email,
-                password
-            });
+            const response = await axios.post(
+                `${import.meta.env.VITE_BASE_URL}/api/user/login`,
+                { email, password }
+            );
 
-            if (response.data && response.data.success) {
-                setSuccess('Login successful!');
-                // Extract user ID and token from the response
-                const userId = response.data.user.id;
-                const token = response.data.token;
-                
-                // First update the context
-                login(token, userId, 'user');
-                
-                // Wait a moment for state to update before navigating
-                setTimeout(() => {
-                    navigate('/user-home');
-                }, 100);
-            } else {
-                setError('Login failed. Please try again.');
-            }
+            const { token, user } = response.data;
+            
+            // Clean token before storing
+            const cleanToken = token.replace('Bearer ', '').trim();
+            
+            // Update context with user info
+            login(user, cleanToken, 'user');
+            
+            // Initialize socket connection
+            await connect(cleanToken);
+
+            setSuccess('Login successful!');
+            
+            // Navigate after successful connection
+            setTimeout(() => {
+                navigate('/user-home');
+            }, 500);
+
         } catch (error) {
-            console.error('Error logging in:', error);
-            setError('Invalid email or password. Please try again.');
+            console.error('Login error:', error);
+            setError(error.response?.data?.message || 'Invalid email or password');
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -53,8 +61,9 @@ const UserLogin = () => {
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="p-3 border-2 border-gray-300 rounded-lg"
+                        className="p-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition duration-200"
                         required
+                        disabled={isLoading}
                     />
                 </div>
 
@@ -64,24 +73,28 @@ const UserLogin = () => {
                         type="password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="p-3 border-2 border-gray-300 rounded-lg"
+                        className="p-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition duration-200"
                         required
+                        disabled={isLoading}
                     />
                 </div>
 
-                {error && <p className="text-red-500">{error}</p>} 
-                {success && <p className="text-green-500">{success}</p>} 
+                {error && <p className="text-red-500 text-sm">{error}</p>}
+                {success && <p className="text-green-500 text-sm">{success}</p>}
 
                 <button 
                     type="submit"
-                    className="bg-black text-white p-4 rounded-xl mt-4 text-xl font-medium"
+                    disabled={isLoading}
+                    className={`bg-black text-white p-4 rounded-xl mt-4 text-xl font-medium transition-all duration-300 ${
+                        isLoading ? 'opacity-70 cursor-not-allowed' : 'hover:bg-gray-800'
+                    }`}
                 >
-                    Login
+                    {isLoading ? 'Logging in...' : 'Login'}
                 </button>
             </form>
 
             <p className="text-sm text-gray-600 mt-6 pb-3">
-                Don't have an account? <Link to="/user-signup" className="text-blue-500">Sign up here</Link>.
+                Don't have an account? <Link to="/user-signup" className="text-blue-500 hover:text-blue-600">Sign up here</Link>
             </p>
 
             <p className="text-sm text-gray-600 mt-6 pb-3">

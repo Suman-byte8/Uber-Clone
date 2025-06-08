@@ -23,9 +23,10 @@ import {
 } from "../../socket/emitters";
 import { onNewRideRequest } from "../../socket/listeners";
 import { useToast } from "../../context/ToastContext";
-import CancellationModal from "../../components/CancellationModal"; // Import CancellationModal
+import CancellationModal from "../../components/Modals/CancellationModal"; // Import CancellationModal
 import RideHistory from "./RideHistory"; // Import RideHistory
 import Settings from "./Settings";
+import RideDetails from "../../components/RideDetails";
 
 const CaptainHome = () => {
   const [isDriverOnline, setIsDriverOnline] = useState(false);
@@ -50,6 +51,8 @@ const CaptainHome = () => {
   const [cancelAllowed, setCancelAllowed] = useState(true);
   const [timeLeft, setTimeLeft] = useState(10); // 10-second timer
   const [isRidePanelExpanded, setIsRidePanelExpanded] = useState(false); // New state for ride panel expansion
+  const [showCancelledByDriverModal, setShowCancelledByDriverModal] =
+    useState(false); // New state for tracking cancellation modal
   const { captainId: contextCaptainId } = useUserContext();
   const captainId = localStorage.getItem("captainId") || contextCaptainId; // Use the ID from context if available;
   const token = localStorage.getItem("token");
@@ -495,34 +498,30 @@ const CaptainHome = () => {
     setIncomingRide(null);
   };
 
+  // const handleCancelRide = () => {
+  //   if (!socket || !currentRide) return;
+
+  //   // Show confirmation modal first
+  //   setShowDriverCancelConfirmModal(true);
+  // };
+
+  // Add new function to handle actual cancellation
   const handleCancelRide = () => {
     if (!socket || !currentRide) return;
 
-    // Show confirmation modal first
-    setShowDriverCancelConfirmModal(true);
-  };
+    // Show cancellation modal
+    setShowCancelledByDriverModal(true);
 
-  // Add new function to handle actual cancellation
-  const confirmCancelRide = () => {
-    if (!socket || !currentRide) return;
-
-    cancelRide(socket, {
-      rideId: currentRide.rideId,
-      cancelledBy: "driver",
-      reason: cancelReason || "Driver cancelled the ride",
-    });
-
-    // Close the confirmation modal
-    setShowDriverCancelConfirmModal(false);
-
-    // Show the cancellation notification modal
-    setShowCancellationPopup(true);
-    setCancellationPopupInitiator("driver");
-
-    // Reset states
+    // Reset ride states
     setCurrentRide(null);
     setIncomingRide(null);
-    setShowRideModal(false);
+
+    // Reset timer states
+    setCancelAllowed(false);
+    setTimeLeft(0);
+
+    // Close any open panels
+    setIsRidePanelExpanded(false);
   };
 
   // Update map view when driver location changes
@@ -608,8 +607,11 @@ const CaptainHome = () => {
     [driverLocation]
   );
 
+  // ...[ALL YOUR IMPORTS AND USESTATES REMAIN UNCHANGED]
+
+  // ...[ALL YOUR HOOKS AND FUNCTIONS REMAIN UNCHANGED]
+
   return (
-    
     <div className="w-full max-h-screen bg-gray-100 relative">
       {showHistoryPage ? (
         <RideHistory
@@ -663,8 +665,8 @@ const CaptainHome = () => {
                   />
                 )}
               </>
-              )}
-            
+            )}
+
             {activeIcon === "trend" && <RideHistory />}
             {activeIcon === "settings" && <Settings />}
           </div>
@@ -683,108 +685,63 @@ const CaptainHome = () => {
             </div>
           )}
 
-          {currentRide && currentRide.pickupLocation && currentRide.dropoffLocation ? (
+          {currentRide &&
+          currentRide.pickupLocation &&
+          currentRide.dropoffLocation ? (
             <>
               {/* Dropdown Header */}
-              {
-                !isRidePanelExpanded ?  <div 
-                onClick={() => setIsRidePanelExpanded(!isRidePanelExpanded)}
-                className="fixed left-3 bottom-[8rem] z-30 flex items-center gap-2 bg-white rounded-lg shadow-md px-4 py-2 cursor-pointer hover:bg-gray-50 transition-all duration-300"
-              >
-                <div className={`flex items-center gap-2 ${isRidePanelExpanded ? 'text-blue-600' : 'text-gray-700'}`}>
-                  <i className="ri-taxi-line text-lg" />
-                  <span className="font-medium">Current Ride</span>
+              {!isRidePanelExpanded && (
+                <div
+                  onClick={() => setIsRidePanelExpanded(!isRidePanelExpanded)}
+                  className="fixed left-3 bottom-[8rem] z-30 flex items-center gap-2 bg-white rounded-lg shadow-md px-4 py-2 cursor-pointer hover:bg-gray-50 transition-all duration-300"
+                >
+                  <div
+                    className={`flex items-center gap-2 ${
+                      isRidePanelExpanded ? "text-blue-600" : "text-gray-700"
+                    }`}
+                  >
+                    <i className="ri-taxi-line text-lg" />
+                    <span className="font-medium">Current Ride</span>
+                  </div>
+                  <i
+                    className={`ri-arrow-down-s-line text-xl transition-transform duration-300 ${
+                      isRidePanelExpanded
+                        ? "rotate-180 text-blue-600"
+                        : "text-gray-500"
+                    }`}
+                  />
                 </div>
-                <i className={`ri-arrow-down-s-line text-xl transition-transform duration-300 ${
-                  isRidePanelExpanded ? 'rotate-180 text-blue-600' : 'text-gray-500'
-                }`} />
-              </div>
-              :<></>
-              }
-             
+              )}
 
               {/* Expandable Panel */}
               <div
-                className={`fixed left-0 right-0 bg-white shadow-lg transform transition-all duration-300 ease-in-out z-20 ${
-                  isRidePanelExpanded 
-                    ? 'translate-y-0 border-t border-gray-200' 
-                    : 'translate-y-full'
+                className={`fixed left-0 right-0  bg-white shadow-lg transform transition-all duration-300 ease-in-out z-20 ${
+                  isRidePanelExpanded
+                    ? "translate-y-0 border-t border-gray-200"
+                    : "translate-y-full"
                 }`}
-                style={{ bottom: '5rem' }}
+                style={{ bottom: "0rem" }}
               >
-                {/* Panel Header */}
-                <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-800">Ride Details</h3>
-                  <button
-                    onClick={() => setIsRidePanelExpanded(false)}
-                    className="text-gray-500 hover:text-gray-700"
-                  >
-                    <i className="ri-close-line text-xl" />
-                  </button>
-                </div>
-
-                {/* Panel Content */}
-                <div className="p-4 space-y-4">
-                  {/* Pickup Location */}
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
-                      <i className="ri-map-pin-line text-green-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500 font-medium">Pickup Location</p>
-                      <p className="text-gray-800">{currentRide.pickupLocation.address}</p>
-                    </div>
-                  </div>
-
-                  {/* Dropoff Location */}
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-                      <i className="ri-flag-line text-red-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500 font-medium">Drop-off Location</p>
-                      <p className="text-gray-800">{currentRide.dropoffLocation.address}</p>
-                    </div>
-                  </div>
-
-                  {/* Fare Info */}
-                  <div className="bg-green-50 rounded-lg p-4 flex items-center justify-between">
-                    <span className="text-gray-700 font-medium">Total Fare</span>
-                    <span className="text-2xl font-bold text-green-600">
-                      ₹{currentRide.price || 0}
-                    </span>
-                  </div>
-
-                  {/* Cancel Button */}
-                  <button
-                    onClick={handleCancelRide}
-                    disabled={!cancelAllowed}
-                    className={`w-full py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-all duration-300 ${
-                      cancelAllowed
-                        ? 'bg-red-500 hover:bg-red-600 text-white'
-                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    }`}
-                  >
-                    <i className="ri-close-circle-line" />
-                    {cancelAllowed ? `Cancel Ride (${timeLeft}s)` : 'Cancel Disabled'}
-                  </button>
-                </div>
+                {isRidePanelExpanded ? (
+                  <RideDetails
+                    isRidePanelExpanded={isRidePanelExpanded}
+                    setIsRidePanelExpanded={setIsRidePanelExpanded}
+                    currentRide={currentRide}
+                    handleCancelRide={handleCancelRide}
+                    cancelAllowed={cancelAllowed}
+                    timeLeft={timeLeft}
+                    socket={socket} // Pass socket prop
+                  />
+                ) : null}
               </div>
             </>
-          ) : (
-            <div className="fixed left-4 bottom-20 z-30">
-              <div className="bg-gray-100 text-gray-500 rounded-lg px-4 py-2 flex items-center gap-2">
-                <i className="ri-taxi-line" />
-                <span>No active ride</span>
-              </div>
-            </div>
-          )}
+          ) : null}
 
           {/* Driver Cancel Confirmation Modal */}
           <CancellationModal
             isOpen={showDriverCancelConfirmModal}
             onClose={() => setShowDriverCancelConfirmModal(false)}
-            onConfirm={confirmCancelRide}
+            // onConfirm={confirmCancelRide}
             cancelledBy="driver"
             isDriver={true}
           />
@@ -813,15 +770,38 @@ const CaptainHome = () => {
               </div>
             </div>
           )}
+
+          {/* Cancelled by Driver Modal */}
+          {showCancelledByDriverModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+                <div className="text-center">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
+                    <i className="ri-close-circle-line text-3xl text-red-500" />
+                  </div>
+                  <h3 className="text-xl font-bold mb-2">Ride Cancelled</h3>
+                  <p className="text-gray-600 mb-6">
+                    You have cancelled this ride. The rider has been notified.
+                  </p>
+                  <button
+                    onClick={() => setShowCancelledByDriverModal(false)}
+                    className="w-full bg-black text-white py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors"
+                  >
+                    OK
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <Footer
+            activeIcon={activeIcon}
+            setActiveIcon={setActiveIcon}
+            handleCompassClick={handleCompassClick}
+            setShowHistoryPage={setShowHistoryPage}
+          />
         </>
       )}
-
-      <Footer
-        activeIcon={activeIcon}
-        setActiveIcon={setActiveIcon}
-        handleCompassClick={handleCompassClick}
-        setShowHistoryPage={setShowHistoryPage}
-      />
     </div>
   );
 };

@@ -16,8 +16,8 @@ import CaptainProfile from "./pages/captain/CaptainProfile";
 import UserAccount from "./pages/user/UserAccount";
 import UserLogin from "./pages/user/UserLogin";
 import ChooseRidePanel from "./pages/user/ChooseRidePanel.jsx";
-import ProtectedRoute from "./components/ProtectedRoute";
-import CaptainProtectedWrapper from './components/CaptainProtectedWrapper';
+import ProtectedRoute from "./components/ProtectedWrappers/ProtectedRoute.jsx";
+import CaptainProtectedWrapper from './components/ProtectedWrappers/CaptainProtectedWrapper.jsx';
 import RideHistory from "./pages/captain/RideHistory";
 import Settings from "./pages/captain/Settings";
 import CaptainHomePage from "./pages/captain/Home";
@@ -59,9 +59,6 @@ const App = () => {
           <Route path="/ride-history" element={<RideHistory />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/captain-profile" element={<CaptainProfile />} />
-
-          {/* Test Route */}
-          <Route path="/test" element={<ChooseRidePanel />} />
         </Routes>
 
     </UserProvider>
