@@ -158,23 +158,6 @@ const CaptainProfile = () => {
     }
   };
 
-  const toggleOnlineStatus = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.put(`${import.meta.env.VITE_BASE_URL}/api/captain/${captainId}/toggle-status`, {}, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-      const newStatus = response.data.data.isActive;
-      setProfile(prev => ({ ...prev, isActive: newStatus }));
-      showToast(`Status updated to ${newStatus ? 'Online' : 'Offline'}`, 'info'); // Show info toast
-    } catch (error) {
-      console.error('Error toggling status:', error);
-      showToast('Failed to update status.', 'error'); // Show error toast
-    }
-  };
-
   // Define logout function for this component
   const handleLogout = () => {
     contextLogout(); // Call the logout function from context
@@ -258,17 +241,11 @@ const CaptainProfile = () => {
                 <span className="text-sm text-gray-600">{profile.totalTrips ?? 0} Trips</span>
               </div>
             </div>
-            {/* Online Status Toggle */}
+            {/* Online Status Display */}
             <div className="flex flex-col items-center space-y-2">
-               <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${profile.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                 {profile.isActive ? 'Online' : 'Offline'}
-               </span>
-              <button
-                onClick={toggleOnlineStatus}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 ${profile.isActive ? 'bg-green-600 focus:ring-green-500' : 'bg-gray-300 focus:ring-indigo-500'}`}
-              >
-                <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${profile.isActive ? 'translate-x-5' : 'translate-x-0'}`} />
-              </button>
+              <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${profile.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                {profile.isActive ? 'Online' : 'Offline'}
+              </span>
             </div>
           </div>
            {/* Earnings Stat */}

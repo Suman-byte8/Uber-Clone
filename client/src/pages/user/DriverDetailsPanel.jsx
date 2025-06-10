@@ -183,7 +183,7 @@ const DriverDetailsPanel = ({
         </div>
 
         {/* Map Section */}
-        <div className="h-[400px] w-full mt-4 relative overflow-hidden rounded-lg">
+        <div className="h-[400px] w-full mt-4 relative overflow-hidden rounded-lg p-6 shadow-md">
           <LivePosition
             location={riderLocation}
             driverLocation={driverLocation}

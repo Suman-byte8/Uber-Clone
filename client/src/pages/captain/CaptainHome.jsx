@@ -646,7 +646,7 @@ const CaptainHome = () => {
                 className="w-12 h-12 rounded-full bg-gray-200"
               />
             </Link>
-            <Switcher12 />
+            <Switcher12 onStatusChange={(status) => setIsDriverOnline(status)} />
             <div className="bg-white w-10 h-10 rounded-full flex items-center justify-center shadow-md">
               <CiSearch />
             </div>
