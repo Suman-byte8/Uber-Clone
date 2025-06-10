@@ -391,8 +391,41 @@ const ChooseRidePanel = ({
 
         console.log("Resolved addresses:", { pickupAddress, dropoffAddress });
 
+        // Fetch rider details
+        let riderInfo = { name: "User", photo: null, phone: null, rating: null };
+        
+        try {
+          const riderResponse = await axios.get(
+            `${import.meta.env.VITE_BASE_URL}/api/user/${userId}/public`
+          );
+          
+          console.log("Rider API response:", riderResponse.data);
+          
+          // Check the structure of the response and extract rider details
+          if (riderResponse.data && riderResponse.data.user) {
+            riderInfo = {
+              name: riderResponse.data.user.name || "User",
+              photo: riderResponse.data.user.photo || null,
+              phone: riderResponse.data.user.phone || riderResponse.data.user.phoneNumber || null,
+              rating: riderResponse.data.user.rating || null
+            };
+          } else if (riderResponse.data) {
+            // If the user object is directly in the data
+            riderInfo = {
+              name: riderResponse.data.name || "User",
+              photo: riderResponse.data.photo || null,
+              phone: riderResponse.data.phone || riderResponse.data.phoneNumber || null,
+              rating: riderResponse.data.rating || null
+            };
+          }
+        } catch (userError) {
+          console.error("Error fetching user details:", userError);
+          // Continue with default rider info
+        }
+
         const rideDetails = {
           userId: userId,
+          rider: riderInfo,
           pickupLocation: {
             lat: pickupData.lat,
             lng: pickupData.lng,
@@ -432,8 +465,8 @@ const ChooseRidePanel = ({
         });
       } catch (error) {
         console.error("Error preparing ride request:", error);
-        setBookingState("FAILED");
         setErrorMessage("Failed to get location details. Please try again.");
+        setBookingState("FAILED");
       }
     }
   };

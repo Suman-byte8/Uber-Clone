@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
 
 const RideDetails = ({
   isRidePanelExpanded,
@@ -9,6 +10,10 @@ const RideDetails = ({
   timeLeft,
   socket // Add socket prop
 }) => {
+  const [riderDetails, setRiderDetails] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
   // Add cancel handler
   const handleCancelClick = () => {
     if (!cancelAllowed || !socket || !currentRide) return;
@@ -23,6 +28,50 @@ const RideDetails = ({
     // Call the parent's cancel handler
     handleCancelRide();
   };
+
+  // Fetch rider details when currentRide changes
+  useEffect(() => {
+    const fetchRiderDetails = async () => {
+      if (!currentRide || !currentRide.userId) return;
+      
+      setLoading(true);
+      setError(null);
+      
+      try {
+        // Get the token from localStorage
+        const token = localStorage.getItem('token');
+        
+        if (!token) {
+          console.error('No authentication token found');
+          setError('Authentication required');
+          setLoading(false);
+          return;
+        }
+        
+        const response = await axios.get(
+          `${import.meta.env.VITE_BASE_URL || 'http://localhost:8000'}/api/captain/rider/${currentRide.userId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          }
+        );
+        
+        if (response.data.success) {
+          setRiderDetails(response.data.rider);
+        } else {
+          setError('Failed to load rider details');
+        }
+      } catch (err) {
+        console.error('Error fetching rider details:', err);
+        setError('Error loading rider information');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchRiderDetails();
+  }, [currentRide]);
 
   if (!currentRide || !currentRide.pickupLocation || !currentRide.dropoffLocation) {
     return (
@@ -95,6 +144,82 @@ const RideDetails = ({
               <p className="text-sm text-gray-500 font-medium">Drop-off Location</p>
               <p className="text-gray-800">{currentRide.dropoffLocation.address}</p>
             </div>
+          </div>
+
+          {/* Rider Details Section */}
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <h3 className="font-semibold text-blue-800 mb-3">Rider Information</h3>
+            {loading ? (
+              <div className="flex justify-center py-2">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-700"></div>
+              </div>
+            ) : error ? (
+              <p className="text-red-500 text-sm">{error}</p>
+            ) : riderDetails ? (
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
+                  {riderDetails.photo ? (
+                    <img 
+                      src={riderDetails.photo} 
+                      alt={riderDetails.name} 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <i className="ri-user-fill text-3xl text-gray-400"></i>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-gray-900">{riderDetails.name}</p>
+                  {riderDetails.phone && (
+                    <div className="flex items-center gap-2 text-gray-600 mt-1">
+                      <i className="ri-phone-line"></i>
+                      <a href={`tel:${riderDetails.phone}`} className="hover:text-blue-600">
+                        {riderDetails.phone}
+                      </a>
+                    </div>
+                  )}
+                  {riderDetails.rating && (
+                    <div className="flex items-center gap-2 text-gray-600">
+                      <i className="ri-star-fill text-yellow-400"></i>
+                      <span>{riderDetails.rating.toFixed(1)} Rating</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : currentRide.rider ? (
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
+                  {currentRide.rider.photo ? (
+                    <img 
+                      src={currentRide.rider.photo} 
+                      alt={currentRide.rider.name} 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <i className="ri-user-fill text-3xl text-gray-400"></i>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-gray-900">{currentRide.rider.name}</p>
+                  {currentRide.rider.phone && (
+                    <div className="flex items-center gap-2 text-gray-600 mt-1">
+                      <i className="ri-phone-line"></i>
+                      <a href={`tel:${currentRide.rider.phone}`} className="hover:text-blue-600">
+                        {currentRide.rider.phone}
+                      </a>
+                    </div>
+                  )}
+                  {currentRide.rider.rating && (
+                    <div className="flex items-center gap-2 text-gray-600">
+                      <i className="ri-star-fill text-yellow-400"></i>
+                      <span>{currentRide.rider.rating.toFixed(1)} Rating</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <p className="text-gray-500">Rider information not available</p>
+            )}
           </div>
 
           {/* Fare Info */}

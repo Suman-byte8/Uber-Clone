@@ -174,6 +174,7 @@ function setupSocket(io) {
         pendingRideRequests[rideId] = {
           rideId,
           userId: data.userId,
+          rider: data.rider, // Add rider field
           pickupLocation: data.pickupLocation,
           dropoffLocation: data.dropoffLocation,
           price: data.price,

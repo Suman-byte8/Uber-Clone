@@ -296,11 +296,50 @@ const updateLocation = async (req, res) => {
   }
 };
 
+const User = require('../models/user.model');
+
+// Add this function to your existing controller file
+const getRiderDetails = async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    
+    // Find the user by ID
+    const user = await User.findById(userId).select('name phoneNumber currentLocation -_id');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Rider not found'
+      });
+    }
+
+    // Return rider details
+    res.status(200).json({
+      success: true,
+      rider: {
+        name: user.name,
+        phone: user.phoneNumber,
+        // We're not returning a photo since it's not in the model yet
+        // You can add this later when you implement profile photos
+        location: user.currentLocation
+      }
+    });
+  } catch (error) {
+    console.error('Error in getRiderDetails:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   registerCaptain,
   loginCaptain,
   getCaptainDetails,
   updateCaptainDetails,
   toggleOnlineStatus,
-  updateLocation
+  updateLocation,
+  getRiderDetails
 };

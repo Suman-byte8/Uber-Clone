@@ -7,7 +7,8 @@ const {
   getCaptainDetails, 
   updateCaptainDetails, 
   toggleOnlineStatus,
-  updateLocation
+  updateLocation,
+  getRiderDetails // Add this import for the new controller
 } = require('../controllers/captain.controller');
 const { protect, authorize } = require('../middlewares/authMiddleWare');
 
@@ -45,6 +46,9 @@ router.get('/:captainId', protect, authorize('captain'), getCaptainDetails);
 
 // Public route to get basic captain details for ride matching
 router.get('/:captainId/public', getCaptainDetails);
+
+// NEW ROUTE: Get rider details for a captain
+router.get('/rider/:userId', protect, authorize('captain'), getRiderDetails);
 
 // Update captain details route with validation
 router.put('/:captainId', [
