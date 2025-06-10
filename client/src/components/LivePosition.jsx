@@ -31,45 +31,84 @@ const createCustomIcon = (color) => new L.Icon({
 const driverIcon = createCustomIcon('#4A90E2');
 const riderIcon = createCustomIcon('#50C878');
 
-const MapController = ({ driverLocation, riderLocation, isRideActive }) => {
+const MapController = ({ location, driverLocation, isDriver, isRideActive, showRoute }) => {
   const map = useMap();
 
   useEffect(() => {
     if (!map) return;
 
-    console.log("MapController received:", { driverLocation, riderLocation, isRideActive });
+    console.log("MapController received:", { 
+      location, 
+      driverLocation, 
+      isDriver, 
+      isRideActive, 
+      showRoute 
+    });
 
-    if (isRideActive && driverLocation && riderLocation) {
-      // Create bounds
-      const bounds = L.latLngBounds(
-        [driverLocation.lat, driverLocation.lon],
-        [riderLocation.lat, riderLocation.lon || riderLocation.lng]
-      ).pad(0.1);
-      
-      map.fitBounds(bounds);
-      
-      // Draw route line
-      const routeCoordinates = [
-        [driverLocation.lat, driverLocation.lon],
-        [riderLocation.lat, riderLocation.lon || riderLocation.lng]
-      ];
-      
-      // Clear existing polylines
-      map.eachLayer((layer) => {
-        if (layer instanceof L.Polyline) {
-          map.removeLayer(layer);
-        }
-      });
-      
-      // Add new route line
-      L.polyline(routeCoordinates, {
-        color: '#0066FF',
-        weight: 4,
-        opacity: 0.6,
-        dashArray: '10, 10'
-      }).addTo(map);
+    // If we only have one location (no route needed)
+    if (!isRideActive || !showRoute || !driverLocation) {
+      if (location) {
+        console.log("Centering map on primary location:", location);
+        map.setView([location.lat, location.lon || location.lng], 15);
+      }
+      return;
     }
-  }, [map, driverLocation, riderLocation, isRideActive]);
+
+    // If we have both locations and should show route
+    if (location && driverLocation) {
+      try {
+        // Normalize location formats
+        const loc1 = {
+          lat: location.lat,
+          lng: location.lon || location.lng
+        };
+        
+        const loc2 = {
+          lat: driverLocation.lat,
+          lng: driverLocation.lon || driverLocation.lng
+        };
+        
+        console.log("Creating route between:", {
+          primary: [loc1.lat, loc1.lng],
+          secondary: [loc2.lat, loc2.lng]
+        });
+        
+        // Create bounds
+        const bounds = L.latLngBounds(
+          [loc1.lat, loc1.lng],
+          [loc2.lat, loc2.lng]
+        ).pad(0.1);
+        
+        console.log("Setting map bounds:", bounds);
+        map.fitBounds(bounds);
+        
+        // Draw route line
+        const routeCoordinates = [
+          [loc1.lat, loc1.lng],
+          [loc2.lat, loc2.lng]
+        ];
+        
+        console.log("Drawing route with coordinates:", routeCoordinates);
+        
+        // Clear existing polylines
+        map.eachLayer((layer) => {
+          if (layer instanceof L.Polyline) {
+            map.removeLayer(layer);
+          }
+        });
+        
+        // Add new route line
+        L.polyline(routeCoordinates, {
+          color: '#0066FF',
+          weight: 4,
+          opacity: 0.7,
+          dashArray: '10, 10'
+        }).addTo(map);
+      } catch (error) {
+        console.error("Error in MapController:", error);
+      }
+    }
+  }, [map, location, driverLocation, isDriver, isRideActive, showRoute]);
 
   return null;
 };
@@ -78,75 +117,102 @@ const LivePosition = ({
   location,
   driverLocation,
   isDriver = false,
-  isRideActive,
+  isRideActive = false,
   showRoute = false,
   onMapReady = () => {} 
 }) => {
   const [map, setMap] = useState(null);
 
+  // Debug logging
+  useEffect(() => {
+    console.log("LivePosition component received props:", {
+      location,
+      driverLocation,
+      isDriver,
+      isRideActive,
+      showRoute
+    });
+  }, [location, driverLocation, isDriver, isRideActive, showRoute]);
+
   useEffect(() => {
     if (map) {
+      console.log("Map instance ready, calling onMapReady");
       map.invalidateSize();
       onMapReady(map);
     }
   }, [map, onMapReady]);
 
-  useEffect(() => {
-    console.log("Location prop:", location);
-    console.log("Driver location prop:", driverLocation);
-  }, [location, driverLocation]);
-
+  // Ensure we have valid location data
   if (!location) {
-    console.log("No location provided");
-    return <div>Loading map...</div>;
+    console.log("No primary location provided to LivePosition");
+    return (
+      <div className="flex items-center justify-center h-full bg-gray-100">
+        <p className="text-gray-500">Loading map...</p>
+      </div>
+    );
   }
 
+  // Normalize location format
+  const primaryLocation = {
+    lat: location.lat,
+    lng: location.lon || location.lng
+  };
+
+  // Normalize driver location if available
+  const secondaryLocation = driverLocation ? {
+    lat: driverLocation.lat,
+    lng: driverLocation.lon || driverLocation.lng
+  } : null;
+
+  console.log("Rendering map with:", {
+    primaryLocation,
+    secondaryLocation,
+    showRoute
+  });
+
   return (
-    <div className="map-container">
-      <MapContainer
-        center={[location.lat, location.lon]}
-        zoom={16}
-        style={{ height: "100%", width: "100%" }}
-        whenCreated={setMap}
-        scrollWheelZoom={true}
-        zoomControl={true}
+    <MapContainer
+      center={[primaryLocation.lat, primaryLocation.lng]}
+      zoom={15}
+      style={{ height: "100%", width: "100%" }}
+      whenCreated={setMap}
+    >
+      <TileLayer
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      />
+      
+      {/* Primary location marker (rider or driver depending on isDriver) */}
+      <Marker 
+        position={[primaryLocation.lat, primaryLocation.lng]} 
+        icon={isDriver ? driverIcon : riderIcon}
       >
-        <TileLayer
-          attribution='This application is Developed by Suman Saha !'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          maxZoom={19}
-        />
-        
-        {/* Current Location Marker */}
-        <Marker
-          position={[location.lat, location.lon]}
-          icon={isDriver ? driverIcon : riderIcon}
+        <Popup>
+          {isDriver ? "Your location" : "Your location"}
+        </Popup>
+      </Marker>
+      
+      {/* Secondary location marker (if available) */}
+      {secondaryLocation && (
+        <Marker 
+          position={[secondaryLocation.lat, secondaryLocation.lng]} 
+          icon={isDriver ? riderIcon : driverIcon}
         >
-          <Popup>Your Location</Popup>
+          <Popup>
+            {isDriver ? "Rider location" : "Driver location"}
+          </Popup>
         </Marker>
-
-        {/* Other Party's Location Marker */}
-        {showRoute && driverLocation && (
-          <Marker
-            position={[driverLocation.lat, driverLocation.lon]}
-            icon={isDriver ? riderIcon : driverIcon}
-          >
-            <Popup>
-              {isDriver ? 'Rider Location' : 'Driver Location'}
-            </Popup>
-          </Marker>
-        )}
-
-        {/* Route Line */}
-        {showRoute && driverLocation && location && (
-          <MapController
-            driverLocation={driverLocation}
-            riderLocation={location}
-            isRideActive={isRideActive}
-          />
-        )}
-      </MapContainer>
-    </div>
+      )}
+      
+      {/* Map controller for centering and route drawing */}
+      <MapController 
+        location={primaryLocation}
+        driverLocation={secondaryLocation}
+        isDriver={isDriver}
+        isRideActive={isRideActive}
+        showRoute={showRoute && !!secondaryLocation}
+      />
+    </MapContainer>
   );
 };
 

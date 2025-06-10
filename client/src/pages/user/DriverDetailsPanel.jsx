@@ -10,21 +10,65 @@ const DriverDetailsPanel = ({
 }) => {
   const [timeLeft, setTimeLeft] = useState(10);
   const [cancellationExpired, setCancellationExpired] = useState(false);
-  const [showTracking, setShowTracking] = useState(false);
-  const [driverLocation, setDriverLocation] = useState(
-    driver?.location || null
-  );
+  const [showTracking, setShowTracking] = useState(true); // Set to true by default
+  const [driverLocation, setDriverLocation] = useState(null);
   const [riderLocation, setRiderLocation] = useState(null);
   const socket = useSocket();
+
+  // Debug logging
+  useEffect(() => {
+    console.log("Driver prop received:", driver);
+    console.log("Driver location from prop:", driver?.location);
+  }, [driver]);
+
+  // Initialize driver location from props or set a default
+  useEffect(() => {
+    // Try to extract location from driver prop
+    if (driver) {
+      // Check if driver has location property
+      if (driver.location) {
+        console.log("Setting driver location from driver.location:", driver.location);
+        setDriverLocation({
+          lat: driver.location.lat,
+          lon: driver.location.lon || driver.location.lng
+        });
+      } 
+      // If no location property, check if lat/lng are directly on driver object
+      else if (driver.lat && (driver.lon || driver.lng)) {
+        console.log("Setting driver location from driver direct properties");
+        setDriverLocation({
+          lat: driver.lat,
+          lon: driver.lon || driver.lng
+        });
+      }
+      // If still no location, set a default near the rider
+      else {
+        console.log("No driver location found in props, will wait for updates");
+      }
+    }
+  }, [driver]);
 
   // Get rider's current location
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((position) => {
-        setRiderLocation({
+        const location = {
           lat: position.coords.latitude,
           lon: position.coords.longitude,
-        });
+        };
+        console.log("Setting rider location:", location);
+        setRiderLocation(location);
+        
+        // If driver location is still null, set a default near the rider
+        if (!driverLocation) {
+          console.log("Setting default driver location near rider");
+          // Set driver location slightly offset from rider (for testing)
+          const defaultDriverLocation = {
+            lat: location.lat + 0.01, // Slightly north
+            lon: location.lon + 0.01  // Slightly east
+          };
+          setDriverLocation(defaultDriverLocation);
+        }
       });
     }
   }, []);
@@ -45,28 +89,35 @@ const DriverDetailsPanel = ({
       console.log("Location update received:", data);
       if (data.captainId === driver.id) {
         console.log("Updating driver location:", data.location);
-        setDriverLocation({
+        const updatedLocation = {
           lat: data.location.lat,
           lon: data.location.lon || data.location.lng,
-        });
+        };
+        console.log("Normalized driver location:", updatedLocation);
+        setDriverLocation(updatedLocation);
       }
     };
 
-    // Initial driver location setup
-    if (driver.location) {
-      console.log("Setting initial driver location:", driver.location);
-      setDriverLocation({
-        lat: driver.location.lat,
-        lon: driver.location.lon || driver.location.lng,
-      });
-    }
-
     socket.on("captainLocationUpdate", handleDriverLocationUpdate);
+
+    // Also listen for general location updates
+    socket.on("locationUpdate", (data) => {
+      console.log("General location update received:", data);
+      if (data.role === "captain" || data.role === "driver") {
+        const updatedLocation = {
+          lat: data.location.lat,
+          lon: data.location.lon || data.location.lng,
+        };
+        console.log("Setting driver location from general update:", updatedLocation);
+        setDriverLocation(updatedLocation);
+      }
+    });
 
     return () => {
       socket.off("captainLocationUpdate", handleDriverLocationUpdate);
+      socket.off("locationUpdate");
     };
-  }, [socket, driver.id, driver.rideId, driver.location]);
+  }, [socket, driver.id, driver.rideId]);
 
   useEffect(() => {
     // Only start the timer if cancellation is allowed
@@ -100,6 +151,15 @@ const DriverDetailsPanel = ({
     console.log("Ride cancelled by rider");
     if (onCancel) onCancel(); // Call the onCancel prop if provided
   };
+
+  // Debug logging for LivePosition props
+  useEffect(() => {
+    console.log("LivePosition props prepared:", {
+      riderLocation,
+      driverLocation,
+      showRoute: showTracking
+    });
+  }, [riderLocation, driverLocation, showTracking]);
 
   return (
     <div className="h-screen flex flex-col bg-white">
@@ -184,13 +244,22 @@ const DriverDetailsPanel = ({
 
         {/* Map Section */}
         <div className="h-[400px] w-full mt-4 relative overflow-hidden rounded-lg p-6 shadow-md">
-          <LivePosition
-            location={riderLocation}
-            driverLocation={driverLocation}
-            isDriver={false}
-            isRideActive={true}
-            showRoute={showTracking}
-          />
+          {riderLocation && (
+            <LivePosition
+              location={riderLocation}
+              driverLocation={driverLocation}
+              isDriver={false}
+              isRideActive={true}
+              showRoute={showTracking}
+            />
+          )}
+          
+          {/* Debug info overlay */}
+          <div className="absolute bottom-2 left-2 bg-white bg-opacity-75 p-2 rounded text-xs z-10">
+            <div>Rider: {riderLocation ? `${riderLocation.lat.toFixed(4)}, ${riderLocation.lon.toFixed(4)}` : 'Loading...'}</div>
+            <div>Driver: {driverLocation ? `${driverLocation.lat.toFixed(4)}, ${driverLocation.lon.toFixed(4)}` : 'Not available'}</div>
+            <div>Tracking: {showTracking ? 'On' : 'Off'}</div>
+          </div>
         </div>
       </div>
 

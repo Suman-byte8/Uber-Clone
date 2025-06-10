@@ -169,7 +169,7 @@ const RideDetails = ({
                   )}
                 </div>
                 <div className="flex-1">
-                  <p className="font-medium text-gray-900">{riderDetails.name}</p>
+                  <p className="font-medium text-gray-900 capitalize">{riderDetails.name}</p>
                   {riderDetails.phone && (
                     <div className="flex items-center gap-2 text-gray-600 mt-1">
                       <i className="ri-phone-line"></i>
