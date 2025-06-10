@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import gsap from "gsap";
+import axios from "axios"; // Import axios for HTTP requests
 // Import the hooks for socket and user context
 import { useSocket, useSocketActions } from "../../context/SocketContext";
 import { useUserContext } from "../../context/UserContext";
@@ -29,13 +30,15 @@ const ChooseRidePanel = ({
   const [errorMessage, setErrorMessage] = useState("");
   const [captainDetails, setCaptainDetails] = useState(null); // Store accepted captain info
   const [currentRideId, setCurrentRideId] = useState(null); // Store the ID of the requested ride
-  const [showCancellationInfoModal, setShowCancellationInfoModal] = useState(false);
+  const [showCancellationInfoModal, setShowCancellationInfoModal] =
+    useState(false);
   const [cancellationInfoSource, setCancellationInfoSource] = useState(null); // 'rider' or 'driver'
   const [cancelAllowed, setCancelAllowed] = useState(true);
   const [showNotification, setShowNotification] = useState(false);
   const [showPanel, setShowPanel] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
-  const [showDriverCancelledModal, setShowDriverCancelledModal] = useState(false);
+  const [showDriverCancelledModal, setShowDriverCancelledModal] =
+    useState(false);
 
   useEffect(() => {
     console.log("showNotification state changed:", showNotification);
@@ -45,7 +48,8 @@ const ChooseRidePanel = ({
 
   // Get socket instance and user ID from context
   const socket = useSocket();
-  const { forceReconnectSocket, isConnected, reconnecting } = useSocketActions();
+  const { forceReconnectSocket, isConnected, reconnecting } =
+    useSocketActions();
   const { userId } = useUserContext(); // Make sure UserContext provides userId
 
   const isLoading = !distance || !estimatedTime || !prices?.car; // Keep your loading logic
@@ -53,9 +57,9 @@ const ChooseRidePanel = ({
   // Function to handle socket reconnection
   const handleSocketReconnection = useCallback(async () => {
     if (reconnecting) return; // Prevent multiple reconnection attempts
-    
+
     console.log("Attempting to reconnect socket...");
-    
+
     try {
       await forceReconnectSocket();
       console.log("Socket reconnected successfully");
@@ -88,24 +92,20 @@ const ChooseRidePanel = ({
   // --- Socket Event Listeners ---
   useEffect(() => {
     if (!socket || !isConnected) {
-      console.log("ChooseRidePanel: Socket not connected yet. Connected:", isConnected);
+      console.log(
+        "ChooseRidePanel: Socket not connected yet. Connected:",
+        isConnected
+      );
       return; // Don't set up listeners if socket is not ready
     }
 
-    console.log("ChooseRidePanel: Setting up socket listeners with connected socket");
+    console.log(
+      "ChooseRidePanel: Setting up socket listeners with connected socket"
+    );
 
     // Register this user socket on server to receive ride events
     socket.emit("registerUser", { userId });
 
-    const handleRideAccepted = (data) => {
-      console.log("Ride Accepted with full details:", JSON.stringify(data));
-      // Check if this acceptance is for the ride we requested
-      if (data.rideId === currentRideId) {
-        setCaptainDetails(data.captainDetails);
-        setBookingState("ACCEPTED");
-        setErrorMessage(""); // Clear any previous errors
-      }
-    };
 
     const handleRideRejected = (data) => {
       console.log("handleRideRejected event payload:", data);
@@ -114,7 +114,9 @@ const ChooseRidePanel = ({
       // For simplicity now, we'll treat it as failure for this request
       if (data.rideId === currentRideId) {
         setNotificationTitle("Ride Rejected");
-        setNotificationMessage(data.message || "The captain could not accept the ride.");
+        setNotificationMessage(
+          data.message || "The captain could not accept the ride."
+        );
         setShowNotification(true);
         setBookingState("FAILED");
         setErrorMessage(
@@ -150,18 +152,22 @@ const ChooseRidePanel = ({
         setCurrentRideId(data.rideId);
         setBookingState("FOUND");
         // Fetch captain details using the public endpoint
-        fetch(`${import.meta.env.VITE_BASE_URL}/api/captain/${data.captainId}/public`)
-          .then(res => res.json())
-          .then(response => {
+        fetch(
+          `${import.meta.env.VITE_BASE_URL}/api/captain/${
+            data.captainId
+          }/public`
+        )
+          .then((res) => res.json())
+          .then((response) => {
             if (response.success) {
               setCaptainDetails({
                 id: data.captainId,
                 ...response.data,
-                estimatedArrival: data.estimatedArrival || 5
+                estimatedArrival: data.estimatedArrival || 5,
               });
             }
           })
-          .catch(err => {
+          .catch((err) => {
             console.error("Error fetching captain details:", err);
           });
       }
@@ -187,25 +193,29 @@ const ChooseRidePanel = ({
       );
 
       if (data.rideId === currentRideId) {
-        console.log("RIDER_VIEW (ChooseRidePanel): rideId matches currentRideId.");
-        
+        console.log(
+          "RIDER_VIEW (ChooseRidePanel): rideId matches currentRideId."
+        );
+
         if (data.cancelledBy === "driver") {
           console.log("Ride cancelled by driver (rider's view)");
-          
+
           // Show notification modal for driver cancellation
           setNotificationTitle("Ride Cancelled");
           setNotificationMessage("The Driver Cancelled the ride, Try again!");
           setShowNotification(true);
-          
+
           // Handle socket reconnection after showing notification
           setTimeout(async () => {
-            console.log("Initiating socket reconnection after driver cancellation");
+            console.log(
+              "Initiating socket reconnection after driver cancellation"
+            );
             await handleSocketReconnection();
           }, 2000); // Give time for notification to be seen
         }
-        
+
         setCancellationInfoSource(data.cancelledBy); // 'driver' or 'rider'
-        
+
         // Reset all ride states
         setBookingState("INITIAL");
         setCaptainDetails(null);
@@ -215,7 +225,7 @@ const ChooseRidePanel = ({
     };
 
     // Register listeners
-    socket.on("rideAccepted", handleRideAccepted);
+    // socket.on("rideAccepted", handleRideAccepted);
     socket.on("rideRejected", handleRideRejected); // Assuming server sends this
     socket.on("noCaptainsAvailable", handleNoCaptainsAvailable); // Assuming server sends this
     socket.on("captainAssigned", handleCaptainAssigned);
@@ -226,7 +236,7 @@ const ChooseRidePanel = ({
     // Cleanup listeners on component unmount or socket change
     return () => {
       console.log("ChooseRidePanel: Cleaning up socket listeners.");
-      socket.off("rideAccepted", handleRideAccepted);
+      // socket.off("rideAccepted", handleRideAccepted);
       socket.off("rideRejected", handleRideRejected);
       socket.off("noCaptainsAvailable", handleNoCaptainsAvailable);
       socket.off("captainAssigned", handleCaptainAssigned);
@@ -235,8 +245,22 @@ const ChooseRidePanel = ({
       socket.off("rideCancelled", handleRideCancelled);
     };
     // Rerun this effect if the socket instance changes
-  }, [socket, currentRideId, bookingState, captainDetails, userId, handleSocketReconnection]); // Add dependencies that handlers rely on
-
+  }, [
+    socket,
+    currentRideId,
+    bookingState,
+    captainDetails,
+    userId,
+    handleSocketReconnection,
+  ]); // Add dependencies that handlers rely on
+  useEffect(() => {
+    console.log("Current state:", {
+      bookingState,
+      captainDetails,
+      currentRideId,
+      showPanel: !!panelRef.current
+    });
+  }, [bookingState, captainDetails, currentRideId]);
   useEffect(() => {
     if (bookingState === "ACCEPTED") {
       setCancelAllowed(true);
@@ -249,13 +273,13 @@ const ChooseRidePanel = ({
 
   const handleUserCancel = () => {
     if (!cancelAllowed || !currentRideId) return;
-    socket.emit("cancelRide", { 
-      rideId: currentRideId, 
-      cancelledBy: 'rider', 
-      userId, 
-      captainId: captainDetails?.id 
+    socket.emit("cancelRide", {
+      rideId: currentRideId,
+      cancelledBy: "rider",
+      userId,
+      captainId: captainDetails?.id,
     });
-    setCancellationInfoSource('rider');
+    setCancellationInfoSource("rider");
     setShowCancellationInfoModal(true);
     setBookingState("INITIAL");
     setErrorMessage("");
@@ -287,43 +311,45 @@ const ChooseRidePanel = ({
         `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`,
         {
           headers: {
-            'Accept-Language': 'en', // Get results in English
-            'User-Agent': 'UberClone/1.0' // Required by Nominatim
-          }
+            "Accept-Language": "en", // Get results in English
+            "User-Agent": "UberClone/1.0", // Required by Nominatim
+          },
         }
       );
-      
-      if (!response.ok) throw new Error('Failed to fetch address');
-      
+
+      if (!response.ok) throw new Error("Failed to fetch address");
+
       const data = await response.json();
       console.log("Nominatim response:", data);
-      
+
       // Extract a meaningful address from the response
       if (data.display_name) {
         // Often the display_name is too verbose, so we can extract parts
-        const parts = data.display_name.split(', ');
+        const parts = data.display_name.split(", ");
         // Take first 2-3 parts for a more concise address
-        return parts.slice(0, 3).join(', ');
+        return parts.slice(0, 3).join(", ");
       } else if (data.address) {
         // Build address from components
         const addressParts = [];
         const address = data.address;
-        
+
         // Try to build a meaningful address from components
-        if (address.road || address.pedestrian || address.neighbourhood) 
-          addressParts.push(address.road || address.pedestrian || address.neighbourhood);
+        if (address.road || address.pedestrian || address.neighbourhood)
+          addressParts.push(
+            address.road || address.pedestrian || address.neighbourhood
+          );
         if (address.suburb) addressParts.push(address.suburb);
-        if (address.city || address.town || address.village) 
+        if (address.city || address.town || address.village)
           addressParts.push(address.city || address.town || address.village);
-        
+
         if (addressParts.length > 0) {
-          return addressParts.join(', ');
+          return addressParts.join(", ");
         }
       }
-      
+
       return `Location at ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
     } catch (error) {
-      console.error('Error fetching address:', error);
+      console.error("Error fetching address:", error);
       return `Location at ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
     }
   };
@@ -331,19 +357,16 @@ const ChooseRidePanel = ({
   // Modify the handleBookRide function to use the address information that should already be available
   const handleBookRide = async () => {
     // Basic validation
-    if (
-      !selectedRide ||
-      !userId ||
-      !pickupData ||
-      !dropoffData
-    ) {
+    if (!selectedRide || !userId || !pickupData || !dropoffData) {
       console.error("Cannot book ride: Missing required ride information", {
         selectedRide,
         userId,
         pickupData,
         dropoffData,
       });
-      setErrorMessage("Could not request ride. Please check all fields are filled.");
+      setErrorMessage(
+        "Could not request ride. Please check all fields are filled."
+      );
       return;
     }
 
@@ -363,7 +386,7 @@ const ChooseRidePanel = ({
         // Fetch actual addresses using reverse geocoding
         const [pickupAddress, dropoffAddress] = await Promise.all([
           fetchAddressFromCoordinates(pickupData.lat, pickupData.lng),
-          fetchAddressFromCoordinates(dropoffData.lat, dropoffData.lng)
+          fetchAddressFromCoordinates(dropoffData.lat, dropoffData.lng),
         ]);
 
         console.log("Resolved addresses:", { pickupAddress, dropoffAddress });
@@ -373,12 +396,12 @@ const ChooseRidePanel = ({
           pickupLocation: {
             lat: pickupData.lat,
             lng: pickupData.lng,
-            address: pickupAddress
+            address: pickupAddress,
           },
           dropoffLocation: {
             lat: dropoffData.lat,
             lng: dropoffData.lng,
-            address: dropoffAddress
+            address: dropoffAddress,
           },
           rideType: selectedRide,
           price: prices[selectedRide],
@@ -391,12 +414,20 @@ const ChooseRidePanel = ({
         // Emit the ride request to the server
         socket.emit("requestRide", rideDetails, (response) => {
           if (response?.status === "received" && response?.rideId) {
-            console.log("Ride request received by server, ride ID:", response.rideId);
+            console.log(
+              "Ride request received by server, ride ID:",
+              response.rideId
+            );
             setCurrentRideId(response.rideId);
           } else if (response?.status === "error") {
-            console.error("Server error processing ride request:", response.message);
+            console.error(
+              "Server error processing ride request:",
+              response.message
+            );
             setBookingState("FAILED");
-            setErrorMessage(response.message || "Server error. Please try again.");
+            setErrorMessage(
+              response.message || "Server error. Please try again."
+            );
           }
         });
       } catch (error) {
@@ -411,59 +442,59 @@ const ChooseRidePanel = ({
   // const extractAddressFromLocationData = (locationData) => {
   //   // Log the full object to see what's available
   //   console.log("Extracting address from:", locationData);
-    
+
   //   // Try different possible address fields
   //   if (typeof locationData === 'object' && locationData !== null) {
   //     // If it has a display_name property (common in OpenStreetMap responses)
   //     if (locationData.display_name) {
   //       return locationData.display_name;
   //     }
-      
+
   //     // If it has a formatted_address property (common in Google Maps responses)
   //     if (locationData.formatted_address) {
   //       return locationData.formatted_address;
   //     }
-      
+
   //     // If it has a name property
   //     if (locationData.name) {
   //       return locationData.name;
   //     }
-      
+
   //     // If it has an address property that's a string
   //     if (typeof locationData.address === 'string') {
   //       return locationData.address;
   //     }
-      
+
   //     // If it has an address property that's an object (common in some APIs)
   //     if (typeof locationData.address === 'object' && locationData.address !== null) {
   //       const addressParts = [];
   //       const address = locationData.address;
-        
+
   //       // Try to build an address from components
   //       if (address.road) addressParts.push(address.road);
   //       if (address.house_number) addressParts.push(address.house_number);
   //       if (address.suburb) addressParts.push(address.suburb);
   //       if (address.city || address.town) addressParts.push(address.city || address.town);
   //       if (address.state) addressParts.push(address.state);
-        
+
   //       if (addressParts.length > 0) {
   //         return addressParts.join(', ');
   //       }
   //     }
-      
+
   //     // If it has a place_name property (common in Mapbox responses)
   //     if (locationData.place_name) {
   //       return locationData.place_name;
   //     }
   //   }
-    
+
   //   // If we have lat/lng, create a simple address format
   //   if (locationData.lat && (locationData.lng || locationData.lon)) {
   //     const lat = locationData.lat;
   //     const lng = locationData.lng || locationData.lon;
   //     return `Location at ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
   //   }
-    
+
   //   // Fallback
   //   return "Location details unavailable";
   // };
@@ -500,9 +531,141 @@ const ChooseRidePanel = ({
       <span className="text-xl font-medium text-gray-600 mb-2">
         Preparing your ride options...
       </span>
-
     </div>
   );
+
+  // Add this to ChooseRidePanel.jsx where ride is requested
+  const emitLocation = (location) => {
+    if (socket && currentRideId) {
+      socket.emit("locationUpdate", {
+        rideId: currentRideId,
+        role: "user",
+        location: {
+          lat: location.lat,
+          lon: location.lon,
+          address: location.address,
+        },
+      });
+    }
+  };
+
+  // Add this useEffect to continuously update location
+  useEffect(() => {
+    if (!currentRideId) return;
+
+    const watchId = navigator.geolocation.watchPosition(
+      async (position) => {
+        const location = {
+          lat: position.coords.latitude,
+          lon: position.coords.longitude,
+        };
+
+        try {
+          // Get address for the location
+          const response = await axios.get(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.lat}&lon=${location.lon}`
+          );
+          location.address = response.data.display_name;
+        } catch (error) {
+          console.error("Error getting address:", error);
+        }
+
+        emitLocation(location);
+      },
+      (error) => console.error("Error watching location:", error),
+      { enableHighAccuracy: true }
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [currentRideId, socket]);
+
+  useEffect(() => {
+    if (!socket) {
+      console.log("🚕 RIDER_VIEW: Socket not available");
+      return;
+    }
+  
+    console.log("🚕 RIDER_VIEW: Setting up socket listeners for ride responses");
+    console.log("🚕 RIDER_VIEW: Current ride ID:", currentRideId);
+  
+    const handleRideAccepted = (data) => {
+      console.log("🎉 RIDER_VIEW: ===== RIDE ACCEPTED EVENT RECEIVED =====");
+      console.log("🎉 RIDER_VIEW: Full data received:", JSON.stringify(data, null, 2));
+      console.log("🎉 RIDER_VIEW: Event ride ID:", data.rideId);
+      console.log("🎉 RIDER_VIEW: Current ride ID:", currentRideId);
+      
+      if (data.rideId === currentRideId) {
+        console.log("🎉 RIDER_VIEW: Ride IDs match! Updating booking state to ACCEPTED");
+        console.log("🎉 RIDER_VIEW: Previous booking state:", bookingState);
+        
+        setBookingState("ACCEPTED");
+        
+        if (data.captainDetails) {
+          console.log("🎉 RIDER_VIEW: Updating captain details:", data.captainDetails);
+          setCaptainDetails(prev => ({
+            ...prev,
+            ...data.captainDetails
+          }));
+        }
+        
+        console.log("🎉 RIDER_VIEW: Booking state updated to ACCEPTED");
+      } else {
+        console.log("🚕 RIDER_VIEW: Ride IDs don't match, ignoring event");
+      }
+    };
+  
+    const handleRideRejected = (data) => {
+      console.log("❌ RIDER_VIEW: ===== RIDE REJECTED EVENT RECEIVED =====");
+      console.log("❌ RIDER_VIEW: Full data received:", JSON.stringify(data, null, 2));
+      console.log("❌ RIDER_VIEW: Event ride ID:", data.rideId);
+      console.log("❌ RIDER_VIEW: Current ride ID:", currentRideId);
+      
+      if (data.rideId === currentRideId) {
+        console.log("❌ RIDER_VIEW: Ride IDs match! Driver rejected the ride");
+        console.log("❌ RIDER_VIEW: Resetting to search for another driver");
+        
+        setBookingState("SEARCHING");
+        setCaptainDetails(null);
+      } else {
+        console.log("❌ RIDER_VIEW: Ride IDs don't match, ignoring event");
+      }
+    };
+  
+    const handleAllSocketEvents = (eventName) => {
+      return (data) => {
+        console.log(`🔔 RIDER_VIEW: Socket event '${eventName}' received:`, data);
+      };
+    };
+  
+    // Listen for ride acceptance and rejection events
+    socket.on("rideAccepted", handleRideAccepted);
+    socket.on("rideRejected", handleRideRejected);
+    
+    // Debug: Listen to all socket events
+    socket.on("connect", () => console.log("🔌 RIDER_VIEW: Socket connected"));
+    socket.on("disconnect", () => console.log("🔌 RIDER_VIEW: Socket disconnected"));
+    socket.on("error", handleAllSocketEvents("error"));
+  
+    return () => {
+      console.log("🚕 RIDER_VIEW: Cleaning up socket listeners");
+      socket.off("rideAccepted", handleRideAccepted);
+      socket.off("rideRejected", handleRideRejected);
+    };
+  }, [socket, currentRideId, bookingState]);
+  
+// Add this useEffect to track state changes
+useEffect(() => {
+  console.log("📊 RIDER_VIEW: State changed:");
+  console.log("📊 RIDER_VIEW: - Booking State:", bookingState);
+  console.log("📊 RIDER_VIEW: - Current Ride ID:", currentRideId);
+  console.log("📊 RIDER_VIEW: - Captain Details:", captainDetails);
+  console.log("📊 RIDER_VIEW: - Show Panel:", showPanel);
+}, [bookingState, currentRideId, captainDetails, showPanel]);
+
+
+// Also add this to see all socket events
+
+
 
   return (
     <>
@@ -537,9 +700,12 @@ const ChooseRidePanel = ({
             {/* Show Driver Details Panel if ride is accepted */}
             {bookingState === "ACCEPTED" && captainDetails ? (
               <DriverDetailsPanel
-                driver={captainDetails}
+                driver={{
+                  ...captainDetails,
+                  rideId: currentRideId, // Make sure to pass the rideId
+                }}
                 onCancel={handleUserCancel}
-                onBack={handleBack} // Allow going back from driver details
+                onBack={handleBack}
                 cancelAllowed={cancelAllowed}
               />
             ) : (
@@ -567,7 +733,9 @@ const ChooseRidePanel = ({
                     <div className="bg-gray-100 p-3 rounded-lg mb-4">
                       <div className="flex justify-between items-center">
                         <span className="text-gray-600">Distance:</span>
-                        <span className="font-medium">{distance?.toFixed(1)} km</span>
+                        <span className="font-medium">
+                          {distance?.toFixed(1)} km
+                        </span>
                       </div>
                       <div className="flex justify-between items-center mt-1">
                         <span className="text-gray-600">Est. Time:</span>
@@ -585,15 +753,18 @@ const ChooseRidePanel = ({
                             <div
                               key={type}
                               onClick={() =>
-                                bookingState !== "SEARCHING" && setSelectedRide(type)
+                                bookingState !== "SEARCHING" &&
+                                setSelectedRide(type)
                               } // Allow selection only if not searching
-                              className={`flex items-center justify-between border-b py-3 transition-all duration-300 ${selectedRide === type
+                              className={`flex items-center justify-between border-b py-3 transition-all duration-300 ${
+                                selectedRide === type
                                   ? "bg-gray-200 shadow-inner px-2 rounded"
                                   : "hover:bg-gray-100 px-2"
-                                } ${bookingState === "SEARCHING"
+                              } ${
+                                bookingState === "SEARCHING"
                                   ? "opacity-50 cursor-not-allowed"
                                   : "cursor-pointer"
-                                }`}
+                              }`}
                             >
                               <div className="flex items-center gap-3">
                                 <img
@@ -601,8 +772,8 @@ const ChooseRidePanel = ({
                                     type === "car"
                                       ? "https://i.pinimg.com/736x/8d/21/7b/8d217b1000b642005fea7b6fd6c3d967.jpg" // Use relative paths from public folder
                                       : type === "auto"
-                                        ? "https://www.uber-assets.com/image/upload/f_auto,q_auto:eco,c_fill,h_368,w_552/v1648431773/assets/1d/db8c56-0204-4ce4-81ce-56a11a07fe98/original/Uber_Auto_558x372_pixels_Desktop.png"
-                                        : "https://www.uber-assets.com/image/upload/f_auto,q_auto:eco,c_fill,h_368,w_552/v1648177797/assets/fc/ddecaa-2eee-48fe-87f0-614aa7cee7d3/original/Uber_Moto_312x208_pixels_Mobile.png"
+                                      ? "https://www.uber-assets.com/image/upload/f_auto,q_auto:eco,c_fill,h_368,w_552/v1648431773/assets/1d/db8c56-0204-4ce4-81ce-56a11a07fe98/original/Uber_Auto_558x372_pixels_Desktop.png"
+                                      : "https://www.uber-assets.com/image/upload/f_auto,q_auto:eco,c_fill,h_368,w_552/v1648177797/assets/fc/ddecaa-2eee-48fe-87f0-614aa7cee7d3/original/Uber_Moto_312x208_pixels_Mobile.png"
                                   }
                                   alt={`${type} icon`}
                                   className="w-16 h-auto object-contain" // Adjusted size
@@ -620,7 +791,9 @@ const ChooseRidePanel = ({
                                   </p>
                                 </div>
                               </div>
-                              <h2 className="text-lg font-medium">₹{prices[type]}</h2>
+                              <h2 className="text-lg font-medium">
+                                ₹{prices[type]}
+                              </h2>
                             </div>
                           )
                       )}
@@ -634,25 +807,31 @@ const ChooseRidePanel = ({
                     )}
 
                     <button
-                      className={`w-full mt-auto mb-4 p-3 rounded-lg text-lg font-medium transition-colors duration-200 ${selectedRide &&
-                          (bookingState === "INITIAL" || bookingState === "FAILED")
+                      className={`w-full mt-auto mb-4 p-3 rounded-lg text-lg font-medium transition-colors duration-200 ${
+                        selectedRide &&
+                        (bookingState === "INITIAL" ||
+                          bookingState === "FAILED")
                           ? "bg-black text-white hover:bg-gray-800"
                           : bookingState === "SEARCHING"
-                            ? "bg-yellow-500 text-black cursor-wait" // Indicate searching
-                            : bookingState === "FOUND"
-                              ? "bg-green-500 text-white cursor-pointer" // Indicate found
-                              : "bg-gray-300 text-gray-500 cursor-not-allowed" // Disabled state
-                        }`}
+                          ? "bg-yellow-500 text-black cursor-wait" // Indicate searching
+                          : bookingState === "FOUND"
+                          ? "bg-green-500 text-white cursor-pointer" // Indicate found
+                          : "bg-gray-300 text-gray-500 cursor-not-allowed" // Disabled state
+                      }`}
                       disabled={!selectedRide || bookingState === "SEARCHING"}
                       onClick={handleBookRide}
                     >
                       {bookingState === "INITIAL" &&
-                        `Book ${selectedRide ? pricingTiers[selectedRide]?.name : "a ride"
+                        `Book ${
+                          selectedRide
+                            ? pricingTiers[selectedRide]?.name
+                            : "a ride"
                         }`}
                       {bookingState === "SEARCHING" && "Finding your driver..."}
                       {bookingState === "FOUND" && "Driver found!"}
                       {bookingState === "FAILED" &&
-                        `Retry Booking ${selectedRide ? pricingTiers[selectedRide]?.name : ""
+                        `Retry Booking ${
+                          selectedRide ? pricingTiers[selectedRide]?.name : ""
                         }`}
                       {/* Button text handled by showing DriverDetailsPanel when ACCEPTED */}
                     </button>
@@ -666,6 +845,5 @@ const ChooseRidePanel = ({
     </>
   );
 };
-
 
 export default ChooseRidePanel;

@@ -19,5 +19,9 @@ export const REQUEST_RIDE = 'requestRide';
 export const NEW_RIDE_REQUEST = 'newRideRequest';
 export const ACCEPT_RIDE = 'acceptRide';
 export const RIDE_ACCEPTED = 'rideAccepted';
+export const REJECT_RIDE = 'rejectRide';
+export const RIDE_REJECTED = 'rideRejected';
+export const CANCEL_RIDE = 'cancelRide';
+export const RIDE_CANCELLED = 'rideCancelled';
 
 // Add more event constants as needed

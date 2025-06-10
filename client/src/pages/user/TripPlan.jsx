@@ -339,8 +339,11 @@ const TripPlan = () => {
         <i className="ri-arrow-left-line text-3xl"></i>
       </button>
 
-      <div className="h- w-full z-[1]">
-        <LivePosition location={location} />
+      <div className="h-full w-full">
+        <LivePosition 
+          location={location}
+          isDriver={false}
+        />
       </div>
 
       {!showChooseRidePanel && (

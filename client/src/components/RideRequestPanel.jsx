@@ -23,55 +23,109 @@ const RideRequestPanel = ({ ride, onAccept, onReject, socket, captainId }) => {
         }
         setCancelledBy(data.cancelledBy);
         setShowCancellationModal(true);
-        // If the ride was cancelled by the other party, treat it as a rejection for this panel's state
         if (onReject) {
-          onReject(); // Reset the panel or navigate back
+          onReject();
         }
       }
     };
 
+    // Listen for acceptance confirmation
+    const handleRideAcceptanceConfirmed = (data) => {
+      console.log("DRIVER_VIEW: Ride acceptance confirmed by server:", data);
+    };
+
     socket.on("rideCancelled", handleRideCancelled);
+    socket.on("rideAcceptanceConfirmed", handleRideAcceptanceConfirmed);
 
     return () => {
       socket.off("rideCancelled", handleRideCancelled);
+      socket.off("rideAcceptanceConfirmed", handleRideAcceptanceConfirmed);
     };
   }, [socket, ride.rideId]);
 
   const handleCancelRide = () => {
-    // Emit cancellation event with proper data structure
+    console.log("DRIVER_VIEW: Driver cancelling ride:", ride.rideId);
+    
     socket.emit("cancelRide", {
       rideId: ride.rideId,
       captainId,
-      userId: ride.userId, // Assuming ride object has userId
+      userId: ride.userId,
       cancelledBy: "driver",
       cancelTime: new Date().toISOString(),
       reason: "Driver cancelled the ride"
     });
 
-    console.log("Driver cancelled ride:", ride.rideId);
+    console.log("DRIVER_VIEW: Cancel ride event emitted for ride:", ride.rideId);
     
-    // Show cancellation modal
     setCancelledBy("driver");
     setShowCancellationModal(true);
     
-    // After driver cancels, treat it as a rejection for this panel's state
     if (onReject) {
-      onReject(); // Reset the panel or navigate back
+      onReject();
     }
   };
 
   const handleCloseModal = () => {
     setShowCancellationModal(false);
-    // Navigate back or reset state
     if (onReject) onReject();
   };
 
   const handleAccept = () => {
-    if (onAccept) onAccept();
+    console.log("🚗 DRIVER_VIEW: Driver clicked ACCEPT button");
+    console.log("🚗 DRIVER_VIEW: Ride details:", {
+      rideId: ride.rideId,
+      captainId: captainId,
+      userId: ride.userId,
+      pickup: ride.pickupLocation?.address,
+      dropoff: ride.dropoffLocation?.address
+    });
+
+    // Emit ride acceptance event
+    const acceptanceData = {
+      rideId: ride.rideId,
+      captainId: captainId,
+      userId: ride.userId,
+      acceptedAt: new Date().toISOString(),
+      captainDetails: {
+        id: captainId,
+        
+      }
+    };
+
+    console.log("🚗 DRIVER_VIEW: Emitting 'acceptRide' event with data:", acceptanceData);
+    
+    socket.emit("acceptRide", acceptanceData);
+    
+    console.log("🚗 DRIVER_VIEW: 'acceptRide' event emitted successfully");
+    
+    if (onAccept) {
+      console.log("🚗 DRIVER_VIEW: Calling onAccept callback");
+      onAccept();
+    }
   };
 
   const handleReject = () => {
-    if (onReject) onReject();
+    console.log("🚗 DRIVER_VIEW: Driver clicked REJECT button");
+    console.log("🚗 DRIVER_VIEW: Rejecting ride:", ride.rideId);
+
+    const rejectionData = {
+      rideId: ride.rideId,
+      captainId: captainId,
+      userId: ride.userId,
+      rejectedAt: new Date().toISOString(),
+      reason: "Driver rejected the ride"
+    };
+
+    console.log("🚗 DRIVER_VIEW: Emitting 'rejectRide' event with data:", rejectionData);
+    
+    socket.emit("rejectRide", rejectionData);
+    
+    console.log("🚗 DRIVER_VIEW: 'rejectRide' event emitted successfully");
+    
+    if (onReject) {
+      console.log("🚗 DRIVER_VIEW: Calling onReject callback");
+      onReject();
+    }
   };
 
   return (

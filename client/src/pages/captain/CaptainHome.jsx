@@ -382,15 +382,29 @@ const CaptainHome = () => {
     if (!socket) return;
 
     const handleCounterpartyLocation = (data) => {
+      console.log("🟢 Received counterpartyLocation event:", data);
+      console.log("🟢 Current ride:", currentRide);
+      console.log("🟢 Current rider details:", riderDetails);
+
       // Only process if this is for the current ride
       if (
         currentRide &&
         data.rideId === currentRide.rideId &&
         data.role === "user"
       ) {
+        console.log("🟢 Setting rider location:", {
+          lat: data.location.lat,
+          lon: data.location.lon || data.location.lng,
+          address: data.location.address,
+        });
+
         setRiderDetails((prev) => ({
-          ...(prev || {}),
-          liveLocation: { lat: data.lat, lng: data.lng },
+          ...prev,
+          liveLocation: {
+            lat: data.location.lat,
+            lon: data.location.lon || data.location.lng,
+            address: data.location.address,
+          },
         }));
       }
     };
@@ -451,32 +465,33 @@ const CaptainHome = () => {
   }, [currentRide]);
 
   const handleAcceptRide = () => {
-    if (!incomingRide) return;
+    if (!incomingRide || !driverLocation) return;
+
+    // Ensure we have valid coordinates
+    const captainLocation = {
+      lat: driverLocation.lat,
+      lng: driverLocation.lon, // Make sure we use the correct location format
+    };
+
+    console.log("Sending captain location:", captainLocation);
 
     acceptRide(socket, {
       rideId: incomingRide.rideId,
       captainId,
-      captainLocation: driverLocation
-        ? {
-            lat: driverLocation.lat,
-            lng: driverLocation.lon,
-          }
-        : null,
-      estimatedArrival: 5, // Example ETA in minutes
+      captainLocation,
+      estimatedArrival: 5,
     });
 
-    // Ensure incomingRide has all required properties before setting it as currentRide
-    if (
-      incomingRide.pickupLocation &&
-      incomingRide.dropoffLocation &&
-      incomingRide.price
-    ) {
-      setCurrentRide(incomingRide);
-    } else {
-      console.error(
-        "Incoming ride is missing required properties:",
-        incomingRide
-      );
+    // Update currentRide with normalized location format
+    if (incomingRide.pickupLocation && incomingRide.dropoffLocation) {
+      setCurrentRide({
+        ...incomingRide,
+        pickupLocation: {
+          lat: incomingRide.pickupLocation.lat,
+          lon: incomingRide.pickupLocation.lon || incomingRide.pickupLocation.lng,
+          address: incomingRide.pickupLocation.address,
+        },
+      });
     }
 
     setShowRideModal(false);
@@ -638,13 +653,22 @@ const CaptainHome = () => {
           </nav>
 
           {/* Main Content */}
-          <div className="pt-16 pb-20 _mainContent">
+          <div className="pt-16 pb-20 flex-1 relative">
             {activeIcon === "compass" && (
               <>
-                <LivePosition
-                  location={driverLocation}
-                  onMapReady={handleMapReady}
-                />
+                <div className="h-[calc(100vh-130px)] relative">
+                  <LivePosition
+                    location={driverLocation}
+                    driverLocation={currentRide?.pickupLocation ? {
+                      lat: currentRide.pickupLocation.lat,
+                      lon: currentRide.pickupLocation.lon || currentRide.pickupLocation.lng
+                    } : null}
+                    isDriver={true}
+                    isRideActive={!!currentRide}
+                    showRoute={!!currentRide}
+                    onMapReady={handleMapReady}
+                  />
+                </div>
                 {incomingRide && (
                   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
@@ -686,56 +710,57 @@ const CaptainHome = () => {
           )}
 
           {currentRide &&
-          currentRide.pickupLocation &&
-          currentRide.dropoffLocation ? (
-            <>
-              {/* Dropdown Header */}
-              {!isRidePanelExpanded && (
-                <div
-                  onClick={() => setIsRidePanelExpanded(!isRidePanelExpanded)}
-                  className="fixed left-3 bottom-[8rem] z-30 flex items-center gap-2 bg-white rounded-lg shadow-md px-4 py-2 cursor-pointer hover:bg-gray-50 transition-all duration-300"
-                >
+            currentRide.pickupLocation &&
+            currentRide.dropoffLocation && (
+              <>
+                {/* Dropdown Header */}
+                {!isRidePanelExpanded && (
                   <div
-                    className={`flex items-center gap-2 ${
-                      isRidePanelExpanded ? "text-blue-600" : "text-gray-700"
-                    }`}
+                    onClick={() => setIsRidePanelExpanded(!isRidePanelExpanded)}
+                    className="fixed left-3 bottom-[8rem] z-30 flex items-center gap-2 bg-white rounded-lg shadow-md px-4 py-2 cursor-pointer hover:bg-gray-50 transition-all duration-300"
                   >
-                    <i className="ri-taxi-line text-lg" />
-                    <span className="font-medium">Current Ride</span>
+                    <div className="h-[8px] w-[8px] rounded-full bg-green-600 relative left-[14px] bottom-2"></div>
+                    <div
+                      className={`flex items-center gap-2 ${
+                        isRidePanelExpanded ? "text-blue-600" : "text-gray-700"
+                      }`}
+                    >
+                      <i className="ri-taxi-line text-lg" />
+                      <span className="font-medium">Current Ride</span>
+                    </div>
+                    <i
+                      className={`ri-arrow-down-s-line text-xl transition-transform duration-300 ${
+                        isRidePanelExpanded
+                          ? "rotate-180 text-blue-600"
+                          : "text-gray-500"
+                      }`}
+                    />
                   </div>
-                  <i
-                    className={`ri-arrow-down-s-line text-xl transition-transform duration-300 ${
-                      isRidePanelExpanded
-                        ? "rotate-180 text-blue-600"
-                        : "text-gray-500"
-                    }`}
-                  />
-                </div>
-              )}
+                )}
 
-              {/* Expandable Panel */}
-              <div
-                className={`fixed left-0 right-0  bg-white shadow-lg transform transition-all duration-300 ease-in-out z-20 ${
-                  isRidePanelExpanded
-                    ? "translate-y-0 border-t border-gray-200"
-                    : "translate-y-full"
-                }`}
-                style={{ bottom: "0rem" }}
-              >
-                {isRidePanelExpanded ? (
-                  <RideDetails
-                    isRidePanelExpanded={isRidePanelExpanded}
-                    setIsRidePanelExpanded={setIsRidePanelExpanded}
-                    currentRide={currentRide}
-                    handleCancelRide={handleCancelRide}
-                    cancelAllowed={cancelAllowed}
-                    timeLeft={timeLeft}
-                    socket={socket} // Pass socket prop
-                  />
-                ) : null}
-              </div>
-            </>
-          ) : null}
+                {/* Expandable Panel */}
+                <div
+                  className={`fixed left-0 right-0  bg-white shadow-lg transform transition-all duration-300 ease-in-out z-20 ${
+                    isRidePanelExpanded
+                      ? "translate-y-0 border-t border-gray-200"
+                      : "translate-y-full"
+                  }`}
+                  style={{ bottom: "0rem" }}
+                >
+                  {isRidePanelExpanded ? (
+                    <RideDetails
+                      isRidePanelExpanded={isRidePanelExpanded}
+                      setIsRidePanelExpanded={setIsRidePanelExpanded}
+                      currentRide={currentRide}
+                      handleCancelRide={handleCancelRide}
+                      cancelAllowed={cancelAllowed}
+                      timeLeft={timeLeft}
+                      socket={socket} // Pass socket prop
+                    />
+                  ) : null}
+                </div>
+              </>
+            )}
 
           {/* Driver Cancel Confirmation Modal */}
           <CancellationModal

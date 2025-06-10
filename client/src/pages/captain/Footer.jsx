@@ -5,7 +5,7 @@ import { CiSettings } from "react-icons/ci";
 
 const Footer = ({ activeIcon, setActiveIcon, handleCompassClick }) => {
   return (
-    <footer className="fixed bottom-0 w-full flex items-center justify-between p-4 bg-white z-50">
+    <footer className="fixed bottom-0 w-full flex items-center justify-between p-4 bg-white z-100">
       {/* Compass Button */}
       <button
         onClick={() => {

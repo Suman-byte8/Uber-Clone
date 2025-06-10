@@ -1,97 +1,151 @@
 import React, { useEffect, useState } from "react";
-import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  Popup,
-  ZoomControl,
-  useMap, // Import useMap hook
-} from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
-import 'leaflet/dist/leaflet.css'; // Ensure CSS is imported
+import "leaflet/dist/leaflet.css";
 
-// SVG icon as a string
-const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M18.364 17.364L12 23.7279L5.63604 17.364C2.12132 13.8492 2.12132 8.15076 5.63604 4.63604C9.15076 1.12132 14.8492 1.12132 18.364 4.63604C21.8787 8.15076 21.8787 13.8492 18.364 17.364ZM12 15C14.2091 15 16 13.2091 16 11C16 8.79086 14.2091 7 12 7C9.79086 7 8 8.79086 8 11C8 13.2091 9.79086 15 12 15ZM12 13C10.8954 13 10 12.1046 10 11C10 9.89543 10.8954 9 12 9C13.1046 9 14 9.89543 14 11C14 12.1046 13.1046 13 12 13Z"></path></svg>`;
+// Import marker icons
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+import markerIconRetina from 'leaflet/dist/images/marker-icon-2x.png';
 
-const customIcon = new L.Icon({
-  iconUrl: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svgIcon),
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
+// Fix Leaflet default icon issue
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconUrl: markerIcon,
+  iconRetinaUrl: markerIconRetina,
+  shadowUrl: markerShadow,
 });
 
-// Helper component to invalidate map size
-const MapResizer = () => {
-  const map = useMap();
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      map.invalidateSize();
-      console.log("Map size invalidated"); // Optional: for debugging
-    }, 100);
+// Custom icons for driver and rider
+const createCustomIcon = (color) => new L.Icon({
+  iconUrl: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${color}">
+      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+    </svg>
+  `)}`,
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
+  popupAnchor: [0, -32]
+});
 
-    return () => clearTimeout(timer);
-  }, [map]);
+const driverIcon = createCustomIcon('#4A90E2');
+const riderIcon = createCustomIcon('#50C878');
+
+const MapController = ({ driverLocation, riderLocation, isRideActive }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map) return;
+
+    console.log("MapController received:", { driverLocation, riderLocation, isRideActive });
+
+    if (isRideActive && driverLocation && riderLocation) {
+      // Create bounds
+      const bounds = L.latLngBounds(
+        [driverLocation.lat, driverLocation.lon],
+        [riderLocation.lat, riderLocation.lon || riderLocation.lng]
+      ).pad(0.1);
+      
+      map.fitBounds(bounds);
+      
+      // Draw route line
+      const routeCoordinates = [
+        [driverLocation.lat, driverLocation.lon],
+        [riderLocation.lat, riderLocation.lon || riderLocation.lng]
+      ];
+      
+      // Clear existing polylines
+      map.eachLayer((layer) => {
+        if (layer instanceof L.Polyline) {
+          map.removeLayer(layer);
+        }
+      });
+      
+      // Add new route line
+      L.polyline(routeCoordinates, {
+        color: '#0066FF',
+        weight: 4,
+        opacity: 0.6,
+        dashArray: '10, 10'
+      }).addTo(map);
+    }
+  }, [map, driverLocation, riderLocation, isRideActive]);
+
   return null;
 };
 
-
-const LivePosition = ({ location, onMapReady }) => {
+const LivePosition = ({ 
+  location,
+  driverLocation,
+  isDriver = false,
+  isRideActive,
+  showRoute = false,
+  onMapReady = () => {} 
+}) => {
   const [map, setMap] = useState(null);
 
   useEffect(() => {
     if (map) {
+      map.invalidateSize();
       onMapReady(map);
     }
   }, [map, onMapReady]);
 
-  // Debugging location and map state
   useEffect(() => {
-    console.log("Location state:", location);
-    console.log("Map instance:", map);
-  }, [location, map]);
+    console.log("Location prop:", location);
+    console.log("Driver location prop:", driverLocation);
+  }, [location, driverLocation]);
 
-  const relocateToCurrentLocation = () => {
-    if (map && location) {
-      map.setView([location.lat, location.lon], 15); // Center the map
-      console.log("Map recentered to:", location);
-    } else {
-      console.warn("Location or map instance is unavailable.");
-    }
-  };
-
-  // Ensure location has valid lat/lon before rendering
-  const isValidLocation = location && typeof location.lat === 'number' && typeof location.lon === 'number';
-  const initialCenter = isValidLocation ? [location.lat, location.lon] : [0, 0]; // Default center if location is invalid
+  if (!location) {
+    console.log("No location provided");
+    return <div>Loading map...</div>;
+  }
 
   return (
-    <div className="h-full w-full">
-      {isValidLocation ? ( // Use isValidLocation check
-        <MapContainer
-          center={initialCenter}
-          zoom={15}
-          style={{ height: "100vh", width: "100%", zIndex: "1" }}
-          whenCreated={onMapReady ? setMap : undefined} // Pass setMap only if onMapReady is provided
-          scrollWheelZoom={true}
+    <div className="map-container">
+      <MapContainer
+        center={[location.lat, location.lon]}
+        zoom={16}
+        style={{ height: "100%", width: "100%" }}
+        whenCreated={setMap}
+        scrollWheelZoom={true}
+        zoomControl={true}
+      >
+        <TileLayer
+          attribution='This application is Developed by Suman Saha !'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          maxZoom={19}
+        />
+        
+        {/* Current Location Marker */}
+        <Marker
+          position={[location.lat, location.lon]}
+          icon={isDriver ? driverIcon : riderIcon}
         >
-          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-          <Marker position={[location.lat, location.lon]} icon={customIcon}>
+          <Popup>Your Location</Popup>
+        </Marker>
+
+        {/* Other Party's Location Marker */}
+        {showRoute && driverLocation && (
+          <Marker
+            position={[driverLocation.lat, driverLocation.lon]}
+            icon={isDriver ? riderIcon : driverIcon}
+          >
             <Popup>
-              <span>Your Exact Location</span>
+              {isDriver ? 'Rider Location' : 'Driver Location'}
             </Popup>
           </Marker>
-          <ZoomControl position="topright" />
-          <MapResizer /> {/* Add the MapResizer component */}
-        </MapContainer>
-      ) : (
-        <div className="text-center mt-4">Loading map or waiting for location...</div> // Updated loading message
-      )}
+        )}
 
-      {/* <button
-        onClick={relocateToCurrentLocation}
-        className="fixed bottom-4 right-4 bg-blue-500 text-white p-2 rounded-full shadow-lg"
-      >
-        Recenter
-      </button> */}
+        {/* Route Line */}
+        {showRoute && driverLocation && location && (
+          <MapController
+            driverLocation={driverLocation}
+            riderLocation={location}
+            isRideActive={isRideActive}
+          />
+        )}
+      </MapContainer>
     </div>
   );
 };

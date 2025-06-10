@@ -182,7 +182,8 @@ function setupSocket(io) {
           status: 'pending',
           requestTime: Date.now(),
           driverAccepted: false,
-          timeout: null
+          timeout: null,
+          
         };
         if (callback) {
           callback({ status: 'received', rideId });
@@ -281,68 +282,55 @@ function setupSocket(io) {
 
     // --- Ride Lifecycle ---
     socket.on('acceptRide', async (data) => {
-      if (socket.role === 'captain' && data && data.rideId && pendingRideRequests[data.rideId]) {
-        // Mark that a driver has accepted within the timeout
-        pendingRideRequests[data.rideId].driverAccepted = true;
-        if (pendingRideRequests[data.rideId].timeout) {
-          clearTimeout(pendingRideRequests[data.rideId].timeout);
+      console.log("🚗 SERVER: ===== ACCEPT RIDE EVENT RECEIVED =====");
+      console.log("🚗 SERVER: Data received:", JSON.stringify(data, null, 2));
+      console.log("🚗 SERVER: Captain ID:", data.captainId);
+      console.log("🚗 SERVER: User ID:", data.userId);
+      console.log("🚗 SERVER: Ride ID:", data.rideId);
+      
+      try {
+        const { rideId, captainId, userId } = data;
+        
+        // Update ride status
+        if (rides[rideId]) {
+          rides[rideId].status = 'accepted';
+          rides[rideId].acceptedAt = new Date().toISOString();
+          console.log("🚗 SERVER: Updated ride status to accepted");
+        } else {
+          console.log("❌ SERVER: Ride not found in rides object:", rideId);
         }
-        if (pendingRideRequests[data.rideId].responseTimeout) {
-          clearTimeout(pendingRideRequests[data.rideId].responseTimeout);
+        
+        // Remove from pending requests
+        if (pendingRideRequests[rideId]) {
+          delete pendingRideRequests[rideId];
+          console.log("🚗 SERVER: Removed ride from pending requests");
         }
-        pendingRideRequests[data.rideId].status = 'completed';
-        try {
-          const captain = await Captain.findById(socket.userId);
-          if (!captain) {
-            return;
-          }
-          const captainDetails = {
-            id: captain._id,
-            name: captain.name,
-            phoneNumber: captain.phoneNumber,
-            rating: captain.rating || 4.5,
-            photo: captain.photo || '/default-captain.png',
-            vehicle: captain.vehicle ? {
-              make: captain.vehicle.make || 'Unknown',
-              model: captain.vehicle.model || 'Unknown',
-              color: captain.vehicle.color || 'Unknown',
-              year: captain.vehicle.year || new Date().getFullYear(),
-              licensePlate: captain.vehicle.licensePlate || 'ABC-1234'
-            } : {
-              make: 'Toyota',
-              model: 'Camry',
-              color: 'Blue',
-              year: 2022,
-              licensePlate: 'ABC-1234'
-            },
-            location: captain.currentLocation || data.captainLocation || null,
-            estimatedArrival: data.estimatedArrival || 5
-          };
-          const userSocketId = connectedUsers[pendingRideRequests[data.rideId].userId];
-          if (userSocketId) {
-            io.to(userSocketId).emit('rideAccepted', {
-              rideId: data.rideId,
-              captainDetails
-            });
-          }
-          setTimeout(() => {
-            delete pendingRideRequests[data.rideId];
-            console.log(`[Ride Accepted] Ride ${data.rideId} deleted after driver accepted.`);
-          }, 2000);
-          connectedCaptains[socket.userId].isInRide = true;
-          socket.emit('acceptRideResponse', {
-            status: 'success',
-            rideId: data.rideId,
-            userDetails: {
-              id: pendingRideRequests[data.rideId].userId,
-            }
-          });
-        } catch (error) {
-          socket.emit('acceptRideResponse', {
-            status: 'error',
-            message: 'Failed to process ride acceptance'
-          });
-        }
+        
+        // Find the user's socket
+        console.log("🚗 SERVER: Looking for user socket with ID:", userId);
+        
+        // Emit to ALL connected sockets for debugging (remove this in production)
+        io.emit('rideAccepted', {
+          rideId,
+          captainId,
+          captainDetails: data.captainDetails || {},
+          message: 'Your ride has been accepted!',
+          acceptedAt: new Date().toISOString()
+        });
+        
+        console.log("🎉 SERVER: Emitted 'rideAccepted' event to all clients");
+        
+        // Confirm to captain
+        socket.emit('rideAcceptanceConfirmed', {
+          rideId,
+          message: 'Ride accepted successfully'
+        });
+        
+        console.log("🚗 SERVER: Sent confirmation to captain");
+        
+      } catch (error) {
+        console.error("❌ SERVER: Error accepting ride:", error);
+        socket.emit('error', { message: 'Failed to accept ride' });
       }
     });
 
@@ -377,21 +365,27 @@ function setupSocket(io) {
     });
 
     // --- Location Updates ---
+    // In socket/index.js
     socket.on('updateCaptainLocation', (data) => {
-      if (!data || typeof data !== 'object') {
-        return;
-      }
+      if (!data || typeof data !== 'object') return;
+
       const { lat, lng } = data;
       const isValidLocation =
         typeof lat === 'number' &&
         typeof lng === 'number' &&
         lat >= -90 && lat <= 90 &&
         lng >= -180 && lng <= 180;
+
       if (socket.role === 'captain' && connectedCaptains[socket.userId]) {
         if (isValidLocation) {
-          connectedCaptains[socket.userId].location = { lat, lng };
-          connectedCaptains[socket.userId].isOnline = true;
-          connectedCaptains[socket.userId].lastLocationUpdate = Date.now();
+          // Store location with consistent naming
+          connectedCaptains[socket.userId].location = {
+            lat,
+            lng, // Use lng consistently
+            lastUpdate: Date.now()
+          };
+
+          // Update active rides
           try {
             const activeRides = Object.values(rides || {}).filter(
               ride => ride.captainId === socket.userId
@@ -400,16 +394,13 @@ function setupSocket(io) {
               if (ride.userId) {
                 socket.to(ride.userId).emit('captainLocationUpdate', {
                   captainId: socket.userId,
-                  location: { lat, lng }
+                  location: { lat, lon: lng } // Convert to expected format for client
                 });
               }
             });
-          } catch (error) {}
-          try {
-            if (typeof findNearbyRides === 'function') {
-              findNearbyRides(socket.userId, { lat, lng });
-            }
-          } catch (error) {}
+          } catch (error) {
+            console.error('Error updating ride locations:', error);
+          }
         }
       }
     });
@@ -442,28 +433,24 @@ function setupSocket(io) {
     });
 
     // --- Ride Lifecycle ---
-    socket.on('rejectRide', (data) => {
-      if (!data || !data.rideId || !data.captainId) return;
-      if (pendingRideRequests[data.rideId]) {
-        const userSocketId = connectedUsers[pendingRideRequests[data.rideId].userId];
-        if (userSocketId) {
-          io.to(userSocketId).emit('rideRejected', {
-            rideId: data.rideId,
-            message: 'Captain rejected your ride.'
-          });
-        }
-        const captainSocketId = connectedCaptains[data.captainId]?.socketId;
-        if (captainSocketId) {
-          io.to(captainSocketId).emit('rideRejected', {
-            rideId: data.rideId,
-            message: 'You rejected this ride.'
-          });
-        }
-        pendingRideRequests[data.rideId].status = 'rejected';
-        connectedCaptains[data.captainId].isInRide = false;
-        setTimeout(() => {
-          delete pendingRideRequests[data.rideId];
-        }, 5000);
+    socket.on('rejectRide', async (data) => {
+      console.log("❌ SERVER: ===== REJECT RIDE EVENT RECEIVED =====");
+      console.log("❌ SERVER: Data received:", JSON.stringify(data, null, 2));
+      
+      try {
+        const { rideId, captainId, userId } = data;
+        
+        // Emit to ALL connected sockets for debugging (remove this in production)
+        io.emit('rideRejected', {
+          rideId,
+          captainId,
+          message: 'Driver rejected your ride. Finding another driver...'
+        });
+        
+        console.log("❌ SERVER: Emitted 'rideRejected' event to all clients");
+        
+      } catch (error) {
+        console.error("❌ SERVER: Error rejecting ride:", error);
       }
     });
 
