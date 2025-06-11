@@ -1,12 +1,14 @@
 // socket/index.js
 const Captain = require('../models/captain.model');
-const { setupOtpHandlers } = require('./handlers/otpHandlers');
+const { 
+  connectedUsers, 
+  connectedCaptains, 
+  rides, 
+  otpStore, 
+  pendingRideRequests 
+} = require('./state');
 
-// In-memory stores
-const connectedUsers = {}; // { userId: socketId }
-const connectedCaptains = {}; // { captainId: { socketId, location, isOnline, ... } }
-const pendingRideRequests = {}; // { rideId: { ... } }
-const rides = {}; // { rideId: { ... } }
+const { setupOtpHandlers } = require('./handlers/otpHandlers');
 
 // Utility functions for distance calculation
 const toRadians = (deg) => deg * (Math.PI / 180);
@@ -94,15 +96,16 @@ function generateRideId() {
 }
 
 function setupSocket(io) {
-  global.io = io; // Make io accessible in helper functions
   io.on('connection', (socket) => {
-    console.log(`User connected: ${socket.id}, Role: ${socket.role}, ID: ${socket.userId}`);
-    console.log('Currently connected users:', Object.keys(connectedUsers));
-    console.log('Currently connected captains:', Object.keys(connectedCaptains));
+    console.log('🔌 Socket connected:', socket.id);
+
+    // Set up OTP handlers
+    setupOtpHandlers(io, socket);
 
     // --- Register Captain ---
     socket.on('registerCaptain', (data) => {
       if (data && data.captainId) {
+        console.log("🚗 Captain registered:", data.captainId);
         connectedCaptains[data.captainId] = {
           socketId: socket.id,
           location: data.location || null,
@@ -155,6 +158,7 @@ function setupSocket(io) {
     // --- Register User ---
     socket.on('registerUser', (data) => {
       if (data && data.userId) {
+        console.log("👤 User registered:", data.userId);
         connectedUsers[data.userId] = socket.id;
         socket.userId = data.userId;
         socket.role = 'user';

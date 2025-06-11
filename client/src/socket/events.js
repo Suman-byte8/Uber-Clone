@@ -24,8 +24,9 @@ export const RIDE_REJECTED = 'rideRejected';
 export const CANCEL_RIDE = 'cancelRide';
 export const RIDE_CANCELLED = 'rideCancelled';
 
-// Add these new event constants
+// Add or update these event constants
 export const DRIVER_NEAR_PICKUP = 'driverNearPickup';
+export const REQUEST_OTP = 'requestOtp';
 export const RIDE_OTP_GENERATED = 'rideOtpGenerated';
 export const VERIFY_OTP = 'verifyOtp';
 export const OTP_VERIFICATION_RESULT = 'otpVerificationResult';

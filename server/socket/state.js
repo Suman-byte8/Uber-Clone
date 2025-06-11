@@ -1,9 +1,16 @@
 // In-memory stores
-const connectedUsers = {}; // { userId: socketId }
-const connectedCaptains = {}; // { captainId: { socketId, location, isOnline, ... } }
-const pendingRideRequests = {}; // { rideId: { ... } }
-const rides = {}; // { rideId: { ... } }
-const otpStore = new Map(); // { rideId: { otp, generatedAt, verified } }
+const connectedUsers = {};
+const connectedCaptains = {};
+const pendingRideRequests = {};
+const rides = {};
+const otpStore = new Map();
+
+// Add logging for debugging
+const originalSet = otpStore.set;
+otpStore.set = function(key, value) {
+  console.log("🔑 Storing OTP:", { key, value });
+  return originalSet.call(this, key, value);
+};
 
 module.exports = {
   connectedUsers,

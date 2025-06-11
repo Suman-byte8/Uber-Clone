@@ -9,10 +9,8 @@ const port = process.env.PORT || 8000;
 
 const http = require('http');
 const { Server } = require('socket.io');
-
 const userRoutes = require('./routes/user.route');
 const captainRoutes = require('./routes/captain.route');
-const otpRoutes = require('./routes/otp.route');
 const locationRoutes = require('./routes/location.route');
 app.use(cors());
 app.use(express.json());
@@ -65,7 +63,6 @@ io.use((socket, next) => {
 app.use('/api/user', userRoutes)
 app.use('/api/captain',captainRoutes)
 
-app.use('/api/otp', otpRoutes);
 
 app.use('/api/locations', locationRoutes);
 
@@ -116,6 +113,50 @@ app.post('/api/test/create-captain', async (req, res) => {
 });
 
 // ======= SOCKET LOGIC (refactored) =======
+const { setupOtpHandlers } = require('./socket/handlers/otpHandlers');
+const { otpStore, connectedUsers, connectedCaptains } = require('./socket/state');
+
+io.on('connection', (socket) => {
+  console.log('🔌 New socket connection:', socket.id);
+
+  // Set up OTP handlers FIRST
+  setupOtpHandlers(io, socket);
+
+  // Register user connection
+  socket.on('registerUser', (data) => {
+    if (data && data.userId) {
+      console.log("👤 User registered:", data.userId);
+      connectedUsers[data.userId] = socket.id; // Keep your existing structure
+      socket.userId = data.userId;
+      socket.role = 'user';
+    }
+  });
+
+  // Register captain connection
+  socket.on('registerCaptain', (data) => {
+    if (data && data.captainId) {
+      console.log("🚗 Captain registered:", data.captainId);
+      connectedCaptains[data.captainId] = {
+        socketId: socket.id,
+        ...data
+      };
+      socket.userId = data.captainId;
+      socket.role = 'captain';
+    }
+  });
+
+  socket.on('disconnect', () => {
+    console.log('🔌 Socket disconnected:', socket.id);
+    // Clean up user/captain from connected lists
+    if (socket.role === 'user') {
+      delete connectedUsers[socket.userId];
+    } else if (socket.role === 'captain') {
+      delete connectedCaptains[socket.userId];
+    }
+  });
+});
+
+// Keep your existing setupSocket call
 const setupSocket = require('./socket/index');
 setupSocket(io);
 

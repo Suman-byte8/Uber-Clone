@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useSocket } from "../../context/SocketContext";
 import LivePosition from "../../components/LivePosition";
+import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 
 const DriverDetailsPanel = ({
   driver,
@@ -15,14 +16,8 @@ const DriverDetailsPanel = ({
   const [riderLocation, setRiderLocation] = useState(null);
   const [otp, setOtp] = useState(null);
   const [rideStatus, setRideStatus] = useState('waiting');
-  const [isRequestingOtp, setIsRequestingOtp] = useState(false);
-  const [showTestOtp, setShowTestOtp] = useState(false);
+  const [isOtpVerified, setIsOtpVerified] = useState(false);
   const socket = useSocket();
-
-  // Generate a random 6-digit OTP for testing
-  const generateTestOtp = () => {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-  };
 
   // Initialize driver location from props
   useEffect(() => {
@@ -114,7 +109,17 @@ const DriverDetailsPanel = ({
     };
   }, [socket, driver.id, driver.rideId]);
 
-  // Listen for OTP and ride status events
+  // Add this useEffect to ensure user is registered before requesting OTP
+  useEffect(() => {
+    if (!socket || !driver.userId) return;
+    
+    // Register user first
+    console.log("👤 Registering user:", driver.userId);
+    socket.emit('registerUser', { userId: driver.userId });
+    
+  }, [socket, driver.userId]);
+
+  // Keep your existing OTP listeners but add better error handling
   useEffect(() => {
     if (!socket || !driver.rideId) {
       console.log("Cannot set up OTP listeners - missing socket or rideId");
@@ -123,38 +128,74 @@ const DriverDetailsPanel = ({
     
     console.log("🔑 Setting up OTP and ride status listeners for ride:", driver.rideId);
     
-    // Listen for OTP generation
     const handleOtpGenerated = (data) => {
       console.log("🔑 OTP received from server:", data);
       
       if (data.rideId === driver.rideId) {
-        console.log("🔑 Setting OTP:", data.otp);
         setOtp(data.otp);
         setRideStatus('driver_arrived');
-      } else {
-        console.log("🔑 OTP event received but rideId doesn't match:", {
-          receivedRideId: data.rideId,
-          expectedRideId: driver.rideId
-        });
+        console.log("🔑 OTP set successfully:", data.otp);
       }
     };
+
+    const handleOtpVerified = (data) => {
+      console.log("🔑 RIDER: OTP verified event received:", data);
+      if (data.rideId === driver.rideId || data.debug === 'broadcast_fallback') {
+        setRideStatus('in_progress');
+        setIsOtpVerified(true);
+        console.log("✅ RIDER: OTP verified via otpVerified event");
+        console.log("✅ RIDER: OTP verified successfully - ride in progress");
+      }
+    };
+
+    const handleOtpVerificationResult = (data) => {
+      console.log("🔑 RIDER: OTP verification result received:", data);
+      if (data.rideId === driver.rideId) {
+        if (data.success) {
+          setRideStatus('in_progress');
+          setIsOtpVerified(true);
+          console.log("✅ RIDER: OTP verified via otpVerificationResult event");
+        } else {
+          console.log("❌ RIDER: OTP verification failed:", data.message);
+        }
+      }
+    };
+
+    // ADD: Generic event listener to catch any OTP-related events
+    const handleGenericOtpEvent = (eventName) => (data) => {
+      console.log(`🔑 RIDER: Received ${eventName} event:`, data);
+    };
     
-    // Register all listeners
+    // Register listeners
     socket.on('rideOtpGenerated', handleOtpGenerated);
-    socket.on('otpGenerated', handleOtpGenerated);
-    socket.on('rideOtp', handleOtpGenerated);
+    socket.on('otpVerified', handleOtpVerified);
+    socket.on('otpVerificationResult', handleOtpVerificationResult);
     
-    // Request OTP if we're already at the pickup location
-    console.log("🔑 Requesting OTP for ride:", driver.rideId);
-    socket.emit('requestOtp', { rideId: driver.rideId });
+    // ADD: Listen for any other OTP events for debugging
+    socket.on('otpError', handleGenericOtpEvent('otpError'));
+    socket.on('rideStatusUpdate', handleGenericOtpEvent('rideStatusUpdate'));
     
+    // Add a small delay before requesting OTP to ensure registration is complete
+    const otpRequestTimer = setTimeout(() => {
+      console.log("🔑 Requesting OTP for ride:", driver.rideId);
+      socket.emit('requestOtp', { 
+        rideId: driver.rideId,
+        userId: driver.userId,
+        captainId: driver.id
+      });
+    }, 1000); // 1 second delay
+
     return () => {
       socket.off('rideOtpGenerated', handleOtpGenerated);
-      socket.off('otpGenerated', handleOtpGenerated);
-      socket.off('rideOtp', handleOtpGenerated);
+      socket.off('otpVerified', handleOtpVerified);
+      socket.off('otpVerificationResult', handleOtpVerificationResult);
+      socket.off('otpError', handleGenericOtpEvent('otpError'));
+      socket.off('rideStatusUpdate', handleGenericOtpEvent('rideStatusUpdate'));
+      clearTimeout(otpRequestTimer);
     };
-  }, [socket, driver.rideId]);
+  }, [socket, driver.rideId, driver.id, driver.userId]);
 
+  // Cancellation timer
   useEffect(() => {
     // Only start the timer if cancellation is allowed
     if (!cancelAllowed) return;
@@ -188,38 +229,6 @@ const DriverDetailsPanel = ({
     if (onCancel) onCancel();
   };
 
-  // Function to manually generate a test OTP
-  const handleGenerateTestOtp = () => {
-    setIsRequestingOtp(true);
-    
-    // Try to request from server first
-    if (socket && driver.rideId) {
-      console.log("🔑 Manually requesting OTP for ride:", driver.rideId);
-      
-      socket.emit('requestOtp', { 
-        rideId: driver.rideId,
-        userId: driver.userId || 'unknown',
-        captainId: driver.id
-      });
-      
-      socket.emit('generateOtp', { 
-        rideId: driver.rideId,
-        userId: driver.userId || 'unknown',
-        captainId: driver.id
-      });
-    }
-    
-    // Generate a test OTP after a short delay
-    setTimeout(() => {
-      const testOtp = generateTestOtp();
-      console.log("🔑 Generated test OTP:", testOtp);
-      setOtp(testOtp);
-      setRideStatus('driver_arrived');
-      setShowTestOtp(true);
-      setIsRequestingOtp(false);
-    }, 1000);
-  };
-
   return (
     <div className="h-screen flex flex-col bg-white">
       {/* Header - Keep fixed */}
@@ -235,7 +244,12 @@ const DriverDetailsPanel = ({
         {/* Driver Info */}
         <div className="p-4 flex items-start gap-4 flex-col w-full">
           <div className="w-full flex items-center justify-center mb-2">
-            <span className="text-2xl font-bold">Ride in progress...</span>
+            <span className="text-2xl font-bold">
+              {rideStatus === 'waiting' ? 'Driver is on the way...' :
+               rideStatus === 'driver_arrived' ? 'Driver has arrived!' :
+               rideStatus === 'in_progress' ? 'Ride in progress...' :
+               'Ride in progress...'}
+            </span>
           </div>
           <div className="flex items-center gap-4 w-full">
             <img
@@ -283,11 +297,14 @@ const DriverDetailsPanel = ({
                rideStatus === 'in_progress' ? 'Ride in progress' :
                'Ride completed'}
             </span>
+            {isOtpVerified && (
+              <i className="ri-check-line text-green-600 ml-2"></i>
+            )}
           </div>
         </div>
 
-        {/* OTP Display Section - Show when driver has arrived or test OTP is generated */}
-        {((rideStatus === 'driver_arrived' || rideStatus === 'otp_verified' || showTestOtp) && otp) && (
+        {/* OTP Display Section - Show OTP or Success Animation */}
+        {otp && !isOtpVerified && (
           <div className="mt-4 mx-4 p-4 bg-yellow-50 rounded-lg shadow-md">
             <h3 className="text-lg font-semibold text-center mb-2">Share this code with your driver</h3>
             <div className="flex justify-center">
@@ -305,32 +322,24 @@ const DriverDetailsPanel = ({
           </div>
         )}
 
-        {/* Generate OTP Button - Show when no OTP is available */}
-        {!otp && (
-          <div className="mt-4 mx-4">
-            <button
-              onClick={handleGenerateTestOtp}
-              disabled={isRequestingOtp}
-              className="w-full py-3 bg-blue-500 text-white rounded-lg font-medium flex items-center justify-center"
-            >
-              {isRequestingOtp ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Generating OTP...
-                </>
-              ) : (
-                <>
-                  <i className="ri-key-2-line mr-2"></i>
-                  Generate Verification Code
-                </>
-              )}
-            </button>
-            <p className="text-xs text-center mt-1 text-gray-500">
-              Click to generate a verification code for your driver
-            </p>
+        {/* SUCCESS: Show success animation when OTP is verified */}
+        {isOtpVerified && (
+          <div className="mt-4 mx-4 p-4 bg-green-50 rounded-lg shadow-md">
+            <div className="flex flex-col items-center">
+              <div className="w-32 h-32">
+                <DotLottieReact
+                  src="https://lottie.host/5632cb93-0648-45e8-b4f9-89fdb71edc62/6XYPvOEhsW.lottie"
+                  loop
+                  autoplay
+                />
+              </div>
+              <h3 className="text-lg font-semibold text-center text-green-800 mt-2">
+                OTP Verified Successfully!
+              </h3>
+              <p className="text-sm text-center text-green-600 mt-1">
+                Your ride is now in progress
+              </p>
+            </div>
           </div>
         )}
 
@@ -362,9 +371,13 @@ const DriverDetailsPanel = ({
             <i className="ri-car-line text-xl"></i>
           </div>
           <div>
-            <div className="font-medium">{driver.name} is arriving</div>
+            <div className="font-medium">
+              {rideStatus === 'waiting' ? `${driver.name} is arriving` :
+               rideStatus === 'driver_arrived' ? `${driver.name} has arrived` :
+               rideStatus === 'in_progress' ? `${driver.name} is on the way` : `${driver.name} is on the way`}
+            </div>
             <div className="text-gray-600">
-              Arriving in {driver.estimatedArrival || "3"} minutes
+              Arriving in {driver.estimatedArrival} minutes
             </div>
           </div>
         </div>
@@ -386,7 +399,7 @@ const DriverDetailsPanel = ({
             <div>Rider: {riderLocation ? `${riderLocation.lat.toFixed(4)}, ${riderLocation.lon.toFixed(4)}` : 'Loading...'}</div>
             <div>Driver: {driverLocation ? `${driverLocation.lat.toFixed(4)}, ${driverLocation.lon.toFixed(4)}` : 'Not available'}</div>
             <div>Tracking: {showTracking ? 'On' : 'Off'}</div>
-           
+            <div>OTP: {otp}</div>
           </div>
         </div>
       </div>
