@@ -10,22 +10,23 @@ const DriverDetailsPanel = ({
 }) => {
   const [timeLeft, setTimeLeft] = useState(10);
   const [cancellationExpired, setCancellationExpired] = useState(false);
-  const [showTracking, setShowTracking] = useState(true); // Set to true by default
+  const [showTracking, setShowTracking] = useState(true);
   const [driverLocation, setDriverLocation] = useState(null);
   const [riderLocation, setRiderLocation] = useState(null);
+  const [otp, setOtp] = useState(null);
+  const [rideStatus, setRideStatus] = useState('waiting');
+  const [isRequestingOtp, setIsRequestingOtp] = useState(false);
+  const [showTestOtp, setShowTestOtp] = useState(false);
   const socket = useSocket();
 
-  // Debug logging
-  useEffect(() => {
-    console.log("Driver prop received:", driver);
-    console.log("Driver location from prop:", driver?.location);
-  }, [driver]);
+  // Generate a random 6-digit OTP for testing
+  const generateTestOtp = () => {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  };
 
-  // Initialize driver location from props or set a default
+  // Initialize driver location from props
   useEffect(() => {
-    // Try to extract location from driver prop
     if (driver) {
-      // Check if driver has location property
       if (driver.location) {
         console.log("Setting driver location from driver.location:", driver.location);
         setDriverLocation({
@@ -33,7 +34,6 @@ const DriverDetailsPanel = ({
           lon: driver.location.lon || driver.location.lng
         });
       } 
-      // If no location property, check if lat/lng are directly on driver object
       else if (driver.lat && (driver.lon || driver.lng)) {
         console.log("Setting driver location from driver direct properties");
         setDriverLocation({
@@ -41,7 +41,6 @@ const DriverDetailsPanel = ({
           lon: driver.lon || driver.lng
         });
       }
-      // If still no location, set a default near the rider
       else {
         console.log("No driver location found in props, will wait for updates");
       }
@@ -59,13 +58,11 @@ const DriverDetailsPanel = ({
         console.log("Setting rider location:", location);
         setRiderLocation(location);
         
-        // If driver location is still null, set a default near the rider
         if (!driverLocation) {
           console.log("Setting default driver location near rider");
-          // Set driver location slightly offset from rider (for testing)
           const defaultDriverLocation = {
-            lat: location.lat + 0.01, // Slightly north
-            lon: location.lon + 0.01  // Slightly east
+            lat: location.lat + 0.01,
+            lon: location.lon + 0.01
           };
           setDriverLocation(defaultDriverLocation);
         }
@@ -99,8 +96,6 @@ const DriverDetailsPanel = ({
     };
 
     socket.on("captainLocationUpdate", handleDriverLocationUpdate);
-
-    // Also listen for general location updates
     socket.on("locationUpdate", (data) => {
       console.log("General location update received:", data);
       if (data.role === "captain" || data.role === "driver") {
@@ -118,6 +113,47 @@ const DriverDetailsPanel = ({
       socket.off("locationUpdate");
     };
   }, [socket, driver.id, driver.rideId]);
+
+  // Listen for OTP and ride status events
+  useEffect(() => {
+    if (!socket || !driver.rideId) {
+      console.log("Cannot set up OTP listeners - missing socket or rideId");
+      return;
+    }
+    
+    console.log("🔑 Setting up OTP and ride status listeners for ride:", driver.rideId);
+    
+    // Listen for OTP generation
+    const handleOtpGenerated = (data) => {
+      console.log("🔑 OTP received from server:", data);
+      
+      if (data.rideId === driver.rideId) {
+        console.log("🔑 Setting OTP:", data.otp);
+        setOtp(data.otp);
+        setRideStatus('driver_arrived');
+      } else {
+        console.log("🔑 OTP event received but rideId doesn't match:", {
+          receivedRideId: data.rideId,
+          expectedRideId: driver.rideId
+        });
+      }
+    };
+    
+    // Register all listeners
+    socket.on('rideOtpGenerated', handleOtpGenerated);
+    socket.on('otpGenerated', handleOtpGenerated);
+    socket.on('rideOtp', handleOtpGenerated);
+    
+    // Request OTP if we're already at the pickup location
+    console.log("🔑 Requesting OTP for ride:", driver.rideId);
+    socket.emit('requestOtp', { rideId: driver.rideId });
+    
+    return () => {
+      socket.off('rideOtpGenerated', handleOtpGenerated);
+      socket.off('otpGenerated', handleOtpGenerated);
+      socket.off('rideOtp', handleOtpGenerated);
+    };
+  }, [socket, driver.rideId]);
 
   useEffect(() => {
     // Only start the timer if cancellation is allowed
@@ -144,22 +180,45 @@ const DriverDetailsPanel = ({
 
     // Emit the cancelRide event
     socket.emit("rideCancelled", {
-      rideId: driver.rideId, // Assuming `rideId` is part of the `driver` object
-      cancelledBy: "rider", // Specify who canceled the ride
+      rideId: driver.rideId,
+      cancelledBy: "rider",
     });
 
     console.log("Ride cancelled by rider");
-    if (onCancel) onCancel(); // Call the onCancel prop if provided
+    if (onCancel) onCancel();
   };
 
-  // Debug logging for LivePosition props
-  useEffect(() => {
-    console.log("LivePosition props prepared:", {
-      riderLocation,
-      driverLocation,
-      showRoute: showTracking
-    });
-  }, [riderLocation, driverLocation, showTracking]);
+  // Function to manually generate a test OTP
+  const handleGenerateTestOtp = () => {
+    setIsRequestingOtp(true);
+    
+    // Try to request from server first
+    if (socket && driver.rideId) {
+      console.log("🔑 Manually requesting OTP for ride:", driver.rideId);
+      
+      socket.emit('requestOtp', { 
+        rideId: driver.rideId,
+        userId: driver.userId || 'unknown',
+        captainId: driver.id
+      });
+      
+      socket.emit('generateOtp', { 
+        rideId: driver.rideId,
+        userId: driver.userId || 'unknown',
+        captainId: driver.id
+      });
+    }
+    
+    // Generate a test OTP after a short delay
+    setTimeout(() => {
+      const testOtp = generateTestOtp();
+      console.log("🔑 Generated test OTP:", testOtp);
+      setOtp(testOtp);
+      setRideStatus('driver_arrived');
+      setShowTestOtp(true);
+      setIsRequestingOtp(false);
+    }, 1000);
+  };
 
   return (
     <div className="h-screen flex flex-col bg-white">
@@ -202,10 +261,78 @@ const DriverDetailsPanel = ({
         </div>
 
         <div className="w-full px-4 py-2 bg-gray-50 rounded-lg flex items-center">
-          <span className=" text-center w-full font-bold text-3xl m-3">
+          <span className="text-center w-full font-bold text-3xl m-3">
             {driver.vehicle?.licensePlate}
           </span>
         </div>
+
+        {/* Ride Status Indicator */}
+        <div className="px-4 mt-4">
+          <div className="flex items-center">
+            <div className={`w-3 h-3 rounded-full ${
+              rideStatus === 'waiting' ? 'bg-yellow-500' :
+              rideStatus === 'driver_arrived' ? 'bg-blue-500' :
+              rideStatus === 'otp_verified' ? 'bg-purple-500' :
+              rideStatus === 'in_progress' ? 'bg-green-500' :
+              'bg-gray-500'
+            } mr-2`}></div>
+            <span className="text-sm font-medium">
+              {rideStatus === 'waiting' ? 'Driver is on the way' :
+               rideStatus === 'driver_arrived' ? 'Driver has arrived' :
+               rideStatus === 'otp_verified' ? 'OTP verified' :
+               rideStatus === 'in_progress' ? 'Ride in progress' :
+               'Ride completed'}
+            </span>
+          </div>
+        </div>
+
+        {/* OTP Display Section - Show when driver has arrived or test OTP is generated */}
+        {((rideStatus === 'driver_arrived' || rideStatus === 'otp_verified' || showTestOtp) && otp) && (
+          <div className="mt-4 mx-4 p-4 bg-yellow-50 rounded-lg shadow-md">
+            <h3 className="text-lg font-semibold text-center mb-2">Share this code with your driver</h3>
+            <div className="flex justify-center">
+              <div className="flex space-x-2">
+                {otp.split('').map((digit, index) => (
+                  <div key={index} className="w-10 h-12 flex items-center justify-center bg-white border-2 border-yellow-500 rounded-md text-2xl font-bold">
+                    {digit}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <p className="text-sm text-center mt-2 text-gray-600">
+              Driver will enter this code to start your ride
+            </p>
+          </div>
+        )}
+
+        {/* Generate OTP Button - Show when no OTP is available */}
+        {!otp && (
+          <div className="mt-4 mx-4">
+            <button
+              onClick={handleGenerateTestOtp}
+              disabled={isRequestingOtp}
+              className="w-full py-3 bg-blue-500 text-white rounded-lg font-medium flex items-center justify-center"
+            >
+              {isRequestingOtp ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Generating OTP...
+                </>
+              ) : (
+                <>
+                  <i className="ri-key-2-line mr-2"></i>
+                  Generate Verification Code
+                </>
+              )}
+            </button>
+            <p className="text-xs text-center mt-1 text-gray-500">
+              Click to generate a verification code for your driver
+            </p>
+          </div>
+        )}
 
         {/* Contact Buttons */}
         <div className="px-4 flex flex-col gap-3">
@@ -259,6 +386,7 @@ const DriverDetailsPanel = ({
             <div>Rider: {riderLocation ? `${riderLocation.lat.toFixed(4)}, ${riderLocation.lon.toFixed(4)}` : 'Loading...'}</div>
             <div>Driver: {driverLocation ? `${driverLocation.lat.toFixed(4)}, ${driverLocation.lon.toFixed(4)}` : 'Not available'}</div>
             <div>Tracking: {showTracking ? 'On' : 'Off'}</div>
+           
           </div>
         </div>
       </div>

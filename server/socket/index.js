@@ -1,5 +1,6 @@
 // socket/index.js
 const Captain = require('../models/captain.model');
+const { setupOtpHandlers } = require('./handlers/otpHandlers');
 
 // In-memory stores
 const connectedUsers = {}; // { userId: socketId }

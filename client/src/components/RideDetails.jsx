@@ -8,11 +8,17 @@ const RideDetails = ({
   handleCancelRide,
   cancelAllowed,
   timeLeft,
-  socket // Add socket prop
+  socket // Socket prop
 }) => {
   const [riderDetails, setRiderDetails] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  
+  // OTP and ride status states
+  const [otpInput, setOtpInput] = useState('');
+  const [rideStatus, setRideStatus] = useState('en_route'); // en_route, arrived, otp_verified, in_progress, completed
+  const [verificationError, setVerificationError] = useState(null);
+  const [verificationSuccess, setVerificationSuccess] = useState(false);
 
   // Add cancel handler
   const handleCancelClick = () => {
@@ -28,6 +34,112 @@ const RideDetails = ({
     // Call the parent's cancel handler
     handleCancelRide();
   };
+
+  // Handle OTP input change
+  const handleOtpChange = (e) => {
+    const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+    setOtpInput(value);
+    setVerificationError(null);
+  };
+
+  // Handle OTP verification
+  const handleVerifyOtp = () => {
+    if (otpInput.length === 6 && socket && currentRide) {
+      socket.emit('verifyOtp', {
+        rideId: currentRide.rideId,
+        otp: otpInput
+      });
+    } else {
+      setVerificationError('Please enter a valid 6-digit OTP');
+    }
+  };
+
+  // Handle start ride
+  const handleStartRide = () => {
+    if (socket && currentRide) {
+      socket.emit('startRide', {
+        rideId: currentRide.rideId
+      });
+    }
+  };
+
+  // Handle complete ride
+  const handleCompleteRide = () => {
+    if (socket && currentRide) {
+      socket.emit('completeRide', {
+        rideId: currentRide.rideId
+      });
+    }
+  };
+
+  // Notify server when driver arrives at pickup
+  const notifyDriverArrived = () => {
+    if (socket && currentRide) {
+      setRideStatus('arrived');
+      socket.emit('driverNearPickup', {
+        rideId: currentRide.rideId,
+        userId: currentRide.userId
+      });
+    }
+  };
+
+  // Listen for socket events
+  useEffect(() => {
+    if (!socket || !currentRide) return;
+
+    // Listen for OTP verification result
+    const handleOtpVerificationResult = (data) => {
+      console.log("OTP verification result:", data);
+      if (data.rideId === currentRide.rideId) {
+        if (data.success) {
+          setRideStatus('otp_verified');
+          setVerificationError(null);
+          setVerificationSuccess(true);
+        } else {
+          setVerificationError(
+            data.reason === 'expired' ? 'OTP has expired' : 'Invalid OTP'
+          );
+        }
+      }
+    };
+
+    // Listen for OTP verified
+    const handleOtpVerified = (data) => {
+      console.log("OTP verified event:", data);
+      if (data.rideId === currentRide.rideId) {
+        setRideStatus('otp_verified');
+        setVerificationSuccess(true);
+      }
+    };
+
+    // Listen for ride started
+    const handleRideStarted = (data) => {
+      console.log("Ride started event:", data);
+      if (data.rideId === currentRide.rideId) {
+        setRideStatus('in_progress');
+      }
+    };
+
+    // Listen for ride completed
+    const handleRideCompleted = (data) => {
+      console.log("Ride completed event:", data);
+      if (data.rideId === currentRide.rideId) {
+        setRideStatus('completed');
+      }
+    };
+
+    socket.on('otpVerificationResult', handleOtpVerificationResult);
+    socket.on('otpVerified', handleOtpVerified);
+    socket.on('rideStarted', handleRideStarted);
+    socket.on('rideCompleted', handleRideCompleted);
+
+    return () => {
+      socket.off('otpVerificationResult', handleOtpVerificationResult);
+      socket.off('otpVerified', handleOtpVerified);
+      socket.off('rideStarted', handleRideStarted);
+      socket.off('rideCompleted', handleRideCompleted);
+    };
+  }, [socket, currentRide]);
 
   // Fetch rider details when currentRide changes
   useEffect(() => {
@@ -104,15 +216,15 @@ const RideDetails = ({
 
       {/* Expandable Panel */}
       <div
-        className={`fixed left-0 right-0 bg-white shadow-lg transform transition-all duration-300 ease-in-out z-20 ${
+        className={`fixed left-0 right-0 bg-white shadow-lg transform transition-all duration-300 ease-in-out z-20 overflow-scroll ${
           isRidePanelExpanded 
             ? 'translate-y-0 border-t border-gray-200' 
             : 'translate-y-full'
         }`}
-        style={{ bottom: '5rem' }}
+        style={{ bottom: '5rem', maxHeight: '80vh' }}
       >
         {/* Panel Header */}
-        <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+        <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
           <h3 className="text-lg font-semibold text-gray-800">Ride Details</h3>
           <button
             onClick={() => setIsRidePanelExpanded(false)}
@@ -123,7 +235,25 @@ const RideDetails = ({
         </div>
 
         {/* Panel Content */}
-        <div className="p-4 space-y-4">
+        <div className="p-4 space-y-4 pb-20">
+          {/* Ride Status Indicator */}
+          <div className="bg-gray-50 p-3 rounded-lg flex items-center">
+            <div className={`w-3 h-3 rounded-full mr-2 ${
+              rideStatus === 'en_route' ? 'bg-yellow-500' :
+              rideStatus === 'arrived' ? 'bg-blue-500' :
+              rideStatus === 'otp_verified' ? 'bg-purple-500' :
+              rideStatus === 'in_progress' ? 'bg-green-500' :
+              'bg-gray-500'
+            }`}></div>
+            <span className="text-sm font-medium">
+              {rideStatus === 'en_route' ? 'En route to pickup' :
+               rideStatus === 'arrived' ? 'Arrived at pickup' :
+               rideStatus === 'otp_verified' ? 'OTP verified' :
+               rideStatus === 'in_progress' ? 'Ride in progress' :
+               'Ride completed'}
+            </span>
+          </div>
+
           {/* Pickup Location */}
           <div className="flex items-start gap-3">
             <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
@@ -229,6 +359,28 @@ const RideDetails = ({
               ₹{currentRide.price || 0}
             </span>
           </div>
+
+          {/* OTP Input */}
+          <div className="bg-gray-50 p-3 rounded-lg flex items-center">
+            <input
+              type="text"
+              value={otpInput}
+              onChange={handleOtpChange}
+              placeholder="Enter OTP"
+              className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {verificationError && (
+              <p className="text-red-500 text-sm mt-1">{verificationError}</p>
+            )}
+          </div>
+
+          {/* Verify OTP Button */}
+          <button
+            onClick={handleVerifyOtp}
+            className="w-full py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-all duration-300 bg-blue-500 hover:bg-blue-600 text-white"
+          >
+            Verify OTP
+          </button>
 
           {/* Cancel Button */}
           <button
